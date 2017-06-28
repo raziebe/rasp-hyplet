@@ -3,7 +3,7 @@
 #
 
 ccflags-y += -Iarch/arm64/kvm
-CFLAGS_arm.o := -I.
+CFLAGS_arm.o := -I. -D__TRULY__
 CFLAGS_mmu.o := -I.
 
 KVM=../../../virt/kvm
@@ -27,3 +27,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
 kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+
+obj-$(CONFIG_TRULY_PROTECT)		+= truly/
