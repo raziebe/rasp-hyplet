@@ -32,7 +32,7 @@
  */
 #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
 #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
+#define HYP_PAGE_OFFSET		(PAGE_OFFSET)
 
 /*
  * Our virtual mapping for the idmap-ed MMU-enable code. Must be

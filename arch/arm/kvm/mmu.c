@@ -1650,6 +1650,13 @@ int kvm_mmu_init(void)
 	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
 	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
 	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
+	
+	printk(" HYP_PAGE_OFFSET_SHIFT %x \n"
+	       " HYP_PAGE_OFFSET_MASK  %x \n"
+	       " HYP_PAGE_OFFSET %x \n"	,
+		HYP_PAGE_OFFSET_SHIFT,
+		HYP_PAGE_OFFSET_MASK,
+		HYP_PAGE_OFFSET	);
 
 	/*
 	 * We rely on the linker script to ensure at build time that the HYP
