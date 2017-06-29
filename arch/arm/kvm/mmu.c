@@ -412,6 +412,7 @@ void free_boot_hyp_pgd(void)
 	mutex_unlock(&kvm_hyp_pgd_mutex);
 }
 
+
 /**
  * free_hyp_pgds - free Hyp-mode page tables
  *
@@ -533,7 +534,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-static int __create_hyp_mappings(pgd_t *pgdp,
+int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot)
 {
@@ -547,7 +548,6 @@ static int __create_hyp_mappings(pgd_t *pgdp,
 	end = PAGE_ALIGN(end);
 	do {
 		pgd = pgdp + pgd_index(addr);
-
 		if (pgd_none(*pgd)) {
 			pud = pud_alloc_one(NULL, addr);
 			if (!pud) {
@@ -582,6 +582,28 @@ static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
 	}
 }
 
+unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
+{
+	unsigned long pfn;
+	struct page *pages[1];
+	int nr;
+
+	nr = get_user_pages(current,
+	                     current->mm,
+	                    uaddr,
+	                      1, 0,     /* write */
+	                      1,  /* force */
+	                    (struct page **)&pages, 0);
+	if (nr <= 0){
+	       printk("TP: INSANE: failed to get user pages %p\n",(void *)uaddr);
+	       return 0x00;
+	}
+	pfn = page_to_pfn(pages[0]);
+	page_cache_release(pages[0]);
+	return pfn;
+}
+
+
 /**
  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
  * @from:	The virtual kernel start address of the range
@@ -605,6 +627,7 @@ int create_hyp_mappings(void *from, void *to)
 		int err;
 
 		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
+
 		err = __create_hyp_mappings(hyp_pgd, virt_addr,
 					    virt_addr + PAGE_SIZE,
 					    __phys_to_pfn(phys_addr),
@@ -1650,13 +1673,6 @@ int kvm_mmu_init(void)
 	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
 	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
 	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
-	
-	printk(" HYP_PAGE_OFFSET_SHIFT %x \n"
-	       " HYP_PAGE_OFFSET_MASK  %x \n"
-	       " HYP_PAGE_OFFSET %x \n"	,
-		HYP_PAGE_OFFSET_SHIFT,
-		HYP_PAGE_OFFSET_MASK,
-		HYP_PAGE_OFFSET	);
 
 	/*
 	 * We rely on the linker script to ensure at build time that the HYP
@@ -1672,7 +1688,6 @@ int kvm_mmu_init(void)
 		err = -ENOMEM;
 		goto out;
 	}
-
 	/* Create the idmap in the boot page tables */
 	err = 	__create_hyp_mappings(boot_hyp_pgd,
 				      hyp_idmap_start, hyp_idmap_end,

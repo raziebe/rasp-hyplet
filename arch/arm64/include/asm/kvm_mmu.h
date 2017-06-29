@@ -32,7 +32,7 @@
  */
 #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
 #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-#define HYP_PAGE_OFFSET		(PAGE_OFFSET)
+#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 
 /*
  * Our virtual mapping for the idmap-ed MMU-enable code. Must be
@@ -72,7 +72,8 @@
 #include <asm/pgtable.h>
 
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-
+#define USER_PAGE_OFFSET    (PAGE_OFFSET & 0x0000FFFFFFFFFFFF) // mask out the negatives
+#define USER_TO_HYP(uva)	(uva)
 /*
  * We currently only support a 40bit IPA.
  */
@@ -81,6 +82,7 @@
 #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
 
 int create_hyp_mappings(void *from, void *to);
+int create_hyp_user_mappings(void *from, void *to);
 int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
 void free_boot_hyp_pgd(void);
 void free_hyp_pgds(void);
