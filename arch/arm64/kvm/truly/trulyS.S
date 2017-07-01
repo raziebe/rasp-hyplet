@@ -181,6 +181,7 @@ ENDPROC(truly_set_mdcr_el2)
 ENTRY(truly_run_vm)
 
 	pop	lr, xzr
+
 	mov	x4, lr		// save the link register of EL1 before losing it.
 
 	kern_hyp_va  x0	// grab tvm
@@ -205,45 +206,44 @@ ENTRY(truly_run_vm)
     ldr		x1, [x0, #TP_MDCR_EL2]
 	kern_hyp_va x1
 	msr		mdcr_el2, x1
-	// Clear cntvoff for the host
-	msr	cntvoff_el2, xzr
 
 	mov	lr,x4
 	eret // must eret here. stack pointer is changed
 ENDPROC(truly_run_vm)
 
-/*
- We enter this code when the user executed in EL2 and performed an ilegal
- * command, such as svc or any other.
- * we pad the code back ,move to program counter ot previous position
- * and return to EL0
-*/
-EL2_sync:
-	eret
-ENDPROC(EL2_sync)
 
+EL1_irq:
+	push x0,x1
+	mrs x0,elr_el2  // save the trap command
+	add x0,x0,#4
+	msr elr_el2,x0
+//	ldr x0,=truly_trap
+//	blr x0
+	pop x0,x1
+	eret
+ENDPROC(EL1_irq)
 
 
 // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CHDEEDDC.html
 .align 11
 ENTRY(__truly_vectors)
-        ventry EL2_sync                        //Current EL with SP0
+        invalid_vector	EL2_sync,#1                        //Current EL with SP0
         invalid_vector  EL2_irq_invalid,#2                 // IRQ EL2t
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t
 
-        invalid_vector  EL2_syncELSpx,#5  	              // Current EL with SPx
+        invalid_vector  EL2_syncELSpx,#5  	              		// Current EL with SPx
         invalid_vector  EL2_irq_invalidELSpx,#6                 // IRQ EL2h
         invalid_vector  EL2_fiq_invalidELSpx,#7                 // FIQ EL2h
         invalid_vector  EL2_error_invalidELspx,#8               // Error EL2h
 
         ventry  		EL1_sync                        			// Synchronous 64-bit EL1
-        invalid_vector  EL1_irq,#14                       				// IRQ 64-bit EL1
-        invalid_vector  EL1_fiq_invalid ,#9                // FIQ 64-bit EL1
-        invalid_vector  EL1_error_invalid  ,#10             // Error 64-bit EL1
+        ventry  		EL1_irq                      				// IRQ 64-bit EL1
+        invalid_vector  EL1_fiq_invalid, #9                // FIQ 64-bit EL1
+        invalid_vector  EL1_error_invalid ,#10             // Error 64-bit EL1
 
-        ventry 			EL1_irq  	              							// Synchronous 32-bit EL1
-        invalid_vector  EL1_irq_invalid,#11                 		// IRQ 32-bit EL1
+        invalid_vector	EL132_irq,#17  	          					// Synchronous 32-bit EL1
+        invalid_vector  EL1_irq_invalid, #11                 		// IRQ 32-bit EL1
         invalid_vector  EL1_fiq_invalidLowEL32 ,#12               // FIQ 32-bit EL1
         invalid_vector  EL1_error_invalidLowEL32,#13               // Error 32-bit EL1
 ENDPROC(__truly_vectors)

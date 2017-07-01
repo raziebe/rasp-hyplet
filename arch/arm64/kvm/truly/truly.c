@@ -103,7 +103,6 @@ static void init_procfs(void)
 	    proc_create_data("truly_stats", O_RDWR, NULL, &proc_ops, NULL);
 }
 
-int create_hyp_user_mappings(void *from, void *to);
 
 /*
  * construct page table
@@ -130,12 +129,11 @@ int truly_init(void)
 	_tvm = this_cpu_ptr(&TVM);
 	memset(_tvm, 0x00, sizeof(*_tvm));
 
-//	make_vtcr_el2(_tvm);
-//	make_hcr_el2(_tvm);
-//	make_mdcr_el2(_tvm);
-
-// map start kernel address +100MB
-
+	_tvm->vttbr_el2 = 0;
+	_tvm->hstr_el2 = 0;
+	_tvm->vtcr_el2 = 0;
+	_tvm->hcr_el2 = HCR_TRULY_FLAGS;
+	_tvm->mdcr_el2 = 0x00;
 
 	for_each_possible_cpu(cpu) {
 		struct truly_vm *tv = &per_cpu(TVM, cpu);
@@ -148,7 +146,7 @@ int truly_init(void)
 	return 0;
 }
 
-void truly_map_tvm(void *d)
+void truly_map_tvm(void)
 {
 	int err;
 	struct truly_vm *tv = this_cpu_ptr(&TVM);
@@ -174,6 +172,11 @@ int  truly_function(void)
 	return 111;
 }
 
+int truly_trap(struct truly_vm *tvm)
+{
+	return 0x3355;
+}
+
 #define MLK(b, t) b, t, ((t) - (b)) >> 10
 #define MLM(b, t) b, t, ((t) - (b)) >> 20
 #define MLG(b, t) b, t, ((t) - (b)) >> 30
@@ -186,16 +189,6 @@ void tp_run_vm(void *x)
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
 
-	printk("HYP_PAGE_OFFSET_SHIFT=%lx\n"
-			"HYP_PAGE_OFFSET_MASK=%lx\n"
-			"HYP_PAGE_OFFSET=%lx\n"
-			"PAGE_MASK=%lx\n"
-			"PAGE_OFFSET=%lx \n",
-			(long) HYP_PAGE_OFFSET_SHIFT,
-			(long) HYP_PAGE_OFFSET_MASK,
-			(long) HYP_PAGE_OFFSET,
-			PAGE_MASK,
-			PAGE_OFFSET );
 
 	printk(	  "truly maps:\n"
 			   "\t  fixed   : 0x%16lx - 0x%16lx   (%6ld KB) won't map\n"
@@ -212,8 +205,7 @@ void tp_run_vm(void *x)
 			  MLK_ROUNDUP(__init_begin, __init_end),
 			  MLK_ROUNDUP(_text, _etext),
 			  MLK_ROUNDUP(_sdata, _edata));
-
-
+/*
 	err = create_hyp_mappings( _text ,_etext );
 	if (err){
 		tp_info("Failed to map kernel .text");
@@ -237,6 +229,7 @@ void tp_run_vm(void *x)
 		tp_info("Failed to map kernel addr");
 		return;
 	}
+*/
 
 	vbar_el2_current = truly_get_vectors();
 	if (vbar_el2 != vbar_el2_current) {
@@ -244,32 +237,9 @@ void tp_run_vm(void *x)
 		truly_set_vectors(vbar_el2);
 	}
 	ttvm = tvm;
-	tp_call_hyp(truly_function);
-	tp_info("x30 =%ld\n",tvm->x30);
-}
-
-void set_mdcr_el2(void *dummy)
-{
-	struct truly_vm *tvm = this_cpu_ptr(&TVM);
-	tvm->mdcr_el2 = 0x100;
-	tp_call_hyp(truly_set_mdcr_el2);
-}
-
-void truly_set_trap(void)
-{
-	on_each_cpu(set_mdcr_el2, NULL, 0);
-}
-
-void reset_mdcr_el2(void *dummy)
-{
-	struct truly_vm *tvm = this_cpu_ptr(&TVM);
-	tvm->mdcr_el2 = 0x00;
-	tp_call_hyp(truly_set_mdcr_el2);
-}
-
-void truly_reset_trap(void)
-{
-	on_each_cpu(reset_mdcr_el2, NULL, 0);
+	truly_map_tvm();
+	tp_info("tvm %p\n",tvm);
+	tp_call_hyp(truly_run_vm,tvm);
 }
 
 
