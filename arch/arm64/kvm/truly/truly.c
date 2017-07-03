@@ -15,6 +15,7 @@
 #include <linux/vmalloc.h>
 #include <asm/fixmap.h>
 #include <asm/memory.h>
+#include <linux/blkdev.h>
 
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
@@ -237,21 +238,6 @@ void make_vtcr_el2(struct truly_vm *tvm)
 
 }
 
-void make_hstr_el2(struct truly_vm *tvm)
-{
-	tvm->hstr_el2 = 0;	// 1 << 15 ; // Trap CP15 Cr=15
-}
-
-void make_hcr_el2(struct truly_vm *tvm)
-{
-	tvm->hcr_el2 = HCR_TRULY_FLAGS;
-}
-
-void make_mdcr_el2(struct truly_vm *tvm)
-{
-	tvm->mdcr_el2 = 0x00;
-}
-
 static struct proc_dir_entry *procfs = NULL;
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
@@ -278,8 +264,8 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 
 	for_each_possible_cpu(cpu) {
 		struct truly_vm *tv = &per_cpu(TVM, cpu);
-		len += sprintf(page + len, "cpu %d brk count %ld\n", cpu,
-			       tv->brk_count_el2);
+		len += sprintf(page + len, "cpu %d initialized %ld\n", cpu,
+			       	   tv->initialized);
 	}
 
 	filp->private_data = 0x00;
@@ -329,7 +315,9 @@ int truly_init(void)
     tp_create_pg_tbl(_tvm);
 	make_vtcr_el2(_tvm);
 	_tvm->hstr_el2 = 0;
-	_tvm->hcr_el2 = HCR_TRULY_FLAGS;
+
+	/* B4-1583 */
+	_tvm->hcr_el2 = (HCR_RW | HCR_VM);
 	_tvm->mdcr_el2 = 0x00;
 
 	for_each_possible_cpu(cpu) {
@@ -337,7 +325,6 @@ int truly_init(void)
 		if (tv != _tvm) {
 			memcpy(tv, _tvm, sizeof(*_tvm));
 		}
-		INIT_LIST_HEAD(&tv->hyp_addr_lst);
 	}
 	init_procfs();
 	return 0;
@@ -350,7 +337,6 @@ void truly_map_tvm(void)
 
 	if (tv->initialized)
 		return;
-
 	err = create_hyp_mappings(tv, tv + 1);
 	if (err) {
 		tp_err("Failed to map tvm");
@@ -362,84 +348,129 @@ void truly_map_tvm(void)
 
 }
 
-int  truly_function(void)
+int __hyp_text  matsov_encrypt(struct truly_vm *tv)
 {
-	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(ttvm);
-	tvm->x30 = 101;
-	return 111;
+	int i;
+	int bytes;
+	int c = 0;
+	char *start;
+	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
+
+	bytes  = tvm->protect.size;
+	start = (char *)KERN_TO_HYP(tvm->protect.addr);
+
+	for (i = 0; i < (bytes - 1) ; i++ ) {
+		c += start[i] ^ start[i+1];
+	}
+
+	return c;
 }
 
-int truly_trap(struct truly_vm *tvm)
+int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 {
-	return 0x3355;
+	int i;
+	int bytes;
+	int c = 0;
+	char *start;
+	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
+
+	bytes  = tvm->protect.size;
+	start = (char *)KERN_TO_HYP(tvm->protect.addr);
+
+
+	for (i = 0; i < (bytes - 1) ; i++ ) {
+		c += start[i] ^ start[i+1];
+	}
+
+	return c;
 }
 
-#define MLK(b, t) b, t, ((t) - (b)) >> 10
-#define MLM(b, t) b, t, ((t) - (b)) >> 20
-#define MLG(b, t) b, t, ((t) - (b)) >> 30
-#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+static blk_qc_t (*org_make_request)(struct request_queue *,struct bio*) = NULL;
+//
+// bio_copy_data
+//
+void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
+{
+	int rw;
+	struct bvec_iter src_iter;
+	struct bio_vec src_bv;
+	void *src_p;
+	unsigned bytes;
+	int err;
+
+	src_iter = bi->bi_iter;
+
+	rw = bio_data_dir(bi);
+
+	while (1) {
+		if (!src_iter.bi_size) {
+			bi = bi->bi_next;
+			if (!bi)
+				break;
+			src_iter = bi->bi_iter;
+		}
+
+		src_bv = bio_iter_iovec(bi, src_iter);
+		bytes = src_bv.bv_len;
+		src_p = kmap_atomic(src_bv.bv_page);
+
+		err = create_hyp_mappings(src_p + src_bv.bv_offset,
+				src_p + src_bv.bv_offset + bytes);
+
+		kunmap_atomic(src_p);
+		if (err) {
+			tp_err("Failed to map a bio page");
+			return;
+		}
+
+		tvm->protect.addr = (unsigned long) (src_p + src_bv.bv_offset);
+		tvm->protect.size = bytes;
+		if (rw == READ)
+			tp_call_hyp( matsov_decrypt ,tvm);
+		else
+			tp_call_hyp( matsov_encrypt ,tvm);
+
+		bio_advance_iter(bi, &src_iter, bytes);
+	}
+}
+
+blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bi)
+{
+	bio_map_data_to_hyp(this_cpu_ptr(&TVM), bi);
+	return org_make_request(q, bi);
+}
+
+int truly_add_hook(struct gendisk *disk)
+{
+	struct request_queue *q;
+
+	if (strcmp(disk->disk_name,"vda"))
+			return -1;
+
+	tp_info("hook disk %s\n",disk->disk_name);
+	q = disk->queue;
+	if (q == NULL){
+		tp_err("failed to find a queue");
+		return -1;
+	}
+	org_make_request = q->make_request_fn;
+	q->make_request_fn = truly_make_request_fn;
+	return 0;
+}
+
 
 void tp_run_vm(void *x)
 {
-	int err;
 	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
 
-
-	printk(	  "truly maps:\n"
-			   "\t  fixed   : 0x%16lx - 0x%16lx   (%6ld KB) won't map\n"
-			  "\t  PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
-			  "\t  modules : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
-			  "\t  memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
-			  "\t  .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-			  "\t  .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-			  "\t  .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-			  MLK(FIXADDR_START, FIXADDR_TOP),
-			  MLM(PCI_IO_START, PCI_IO_END),
-			  MLM(MODULES_VADDR, MODULES_END),
-			  MLM(PAGE_OFFSET, (unsigned long)high_memory),
-			  MLK_ROUNDUP(__init_begin, __init_end),
-			  MLK_ROUNDUP(_text, _etext),
-			  MLK_ROUNDUP(_sdata, _edata));
-
-	err = create_hyp_mappings( _text ,_etext );
-	if (err){
-		tp_info("Failed to map kernel .text");
-		return;
-	}
-
-	err = create_hyp_mappings( _sdata ,_edata );
-	if (err){
-		tp_info("Failed to map kernel .data");
-		return;
-	}
-
-	err = create_hyp_mappings( __init_begin, __init_end);
-	if (err){
-		tp_info("Failed to map kernel .int section");
-		return;
-	}
-
-	err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
-	if (err){
-		tp_info("Failed to map kernel addr");
-		return;
-	}
-
-
+	truly_map_tvm(); // debug
 	vbar_el2_current = truly_get_vectors();
 	if (vbar_el2 != vbar_el2_current) {
 		tp_info("vbar_el2 should restore\n");
 		truly_set_vectors(vbar_el2);
 	}
 	ttvm = tvm;
-	tp_info("tvm %p\n",tvm);
-	tp_call_hyp(truly_run_vm,tvm);
+	tp_call_hyp(truly_run_vm, tvm);
 }
-
-
-EXPORT_SYMBOL_GPL(truly_get_vectors);
-EXPORT_SYMBOL_GPL(truly_get_hcr_el2);
-EXPORT_SYMBOL_GPL(tp_call_hyp);
-EXPORT_SYMBOL_GPL(truly_init);

@@ -11,6 +11,7 @@
 #include <asm/alternative.h>
 #include <asm/cpufeature.h>
 
+
 .text
 .pushsection	.hyp.text, "ax" // borrow  hyp.text
 .align	PAGE_SHIFT
@@ -96,10 +97,11 @@ EL1_sync:
 	blr		lr
 
 	pop	lr, xzr
+	eret
 
 3:
-	pop x2,x3
 	pop x0,x1
+	pop x2,x3
 
 2:	eret
 ENDPROC(EL1_sync)
@@ -150,33 +152,12 @@ ENTRY(truly_set_vectors)
 	ret
 ENDPROC(truly_set_vectors)
 
-ENTRY(truly_get_hcr_el2)
-       mrs     x0, hcr_el2
-       ret
-ENDPROC(truly_get_hcr_el2)
-
 ENTRY(tp_call_hyp)
         hvc	#0
         ret
 ENDPROC(tp_call_hyp)
 
-ENTRY(truly_has_vhe)
-        mrs     x2, id_aa64mmfr1_el1
-        ubfx    x2, x2, #8, #4
-		mov	x0,x2 // if zero then no vhe
-ENDPROC(truly_has_vhe)
 
-ENTRY(truly_set_mdcr_el2)
-
-	mrs	x0,tpidr_el2
-
-	kern_hyp_va  x0	// grab tvm
-    ldr		x1, [x0, #TP_MDCR_EL2]
-
-	kern_hyp_va x1
-	msr		mdcr_el2, x1
-	ret
-ENDPROC(truly_set_mdcr_el2)
 
 ENTRY(truly_run_vm)
 
@@ -208,20 +189,8 @@ ENTRY(truly_run_vm)
 	msr		mdcr_el2, x1
 
 	mov	lr,x4
-	eret // must eret here. stack pointer is changed
-ENDPROC(truly_run_vm)
-
-
-EL1_irq:
-	push x0,x1
-	mrs x0,elr_el2  // save the trap command
-	add x0,x0,#4
-	msr elr_el2,x0
-//	ldr x0,=truly_trap
-//	blr x0
-	pop x0,x1
 	eret
-ENDPROC(EL1_irq)
+ENDPROC(truly_run_vm)
 
 
 // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CHDEEDDC.html
@@ -232,13 +201,13 @@ ENTRY(__truly_vectors)
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t
 
-        invalid_vector  EL2_syncELSpx,#5  	              		// Current EL with SPx
+        invalid_vector  ELx_sync, #5  	              						// Current EL with SPx
         invalid_vector  EL2_irq_invalidELSpx,#6                 // IRQ EL2h
         invalid_vector  EL2_fiq_invalidELSpx,#7                 // FIQ EL2h
         invalid_vector  EL2_error_invalidELspx,#8               // Error EL2h
 
         ventry  		EL1_sync                        			// Synchronous 64-bit EL1
-        ventry  		EL1_irq                      				// IRQ 64-bit EL1
+        invalid_vector  EL1_64_irq_invalid ,#18    				// IRQ 64-bit EL1
         invalid_vector  EL1_fiq_invalid, #9                // FIQ 64-bit EL1
         invalid_vector  EL1_error_invalid ,#10             // Error 64-bit EL1
 

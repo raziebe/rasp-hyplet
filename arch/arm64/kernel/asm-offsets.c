@@ -168,17 +168,17 @@ int main(void)
   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
 
   DEFINE(TP_HCR_EL2, offsetof(struct truly_vm,  hcr_el2));
-  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
+//  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
   DEFINE(TP_HSTR_EL2 , offsetof(struct truly_vm,  hstr_el2));
-  DEFINE(TP_X30 , offsetof(struct truly_vm,  x30));
-  DEFINE(TP_SAVE_CMD , offsetof(struct truly_vm,  save_cmd));
+//  DEFINE(TP_X30 , offsetof(struct truly_vm,  x30));
+//  DEFINE(TP_SAVE_CMD , offsetof(struct truly_vm,  save_cmd));
   DEFINE(TP_VTTBR_EL2 , offsetof(struct truly_vm,  vttbr_el2));
   DEFINE(TP_VTCR_EL2 , offsetof(struct truly_vm,  vtcr_el2));
   DEFINE(TP_MDCR_EL2 , offsetof(struct truly_vm,  mdcr_el2));
-  DEFINE(TP_BRK_COUNT_EL2 , offsetof(struct truly_vm,  brk_count_el2));
-  DEFINE(TP_PGD, offsetof(struct truly_vm, protected_pgd));
-  DEFINE(TP_ENC, offsetof(struct truly_vm, enc));
-  DEFINE(TP_ENC_SIZE , offsetof(struct encrypted_segment, size));
-  DEFINE(TP_PAD_DATA , offsetof(struct encrypted_segment, pad_data));
+//  DEFINE(TP_BRK_COUNT_EL2 , offsetof(struct truly_vm,  brk_count_el2));
+//  DEFINE(TP_PGD, offsetof(struct truly_vm, protected_pgd));
+//  DEFINE(TP_ENC, offsetof(struct truly_vm, enc));
+//  DEFINE(TP_ENC_SIZE , offsetof(struct encrypted_segment, size));
+//  DEFINE(TP_PAD_DATA , offsetof(struct encrypted_segment, pad_data));
   return 0;
 }
