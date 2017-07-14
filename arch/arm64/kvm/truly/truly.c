@@ -385,6 +385,22 @@ int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 	return c;
 }
 
+long start_sec = 6291456;
+long end_sec = 6682080;
+
+//
+// For the sake of POC I assume that IOs
+// do not cross boundaries
+//
+int in_boundary(struct bvec_iter* iter)
+{
+	if ( iter->bi_sector < start_sec )
+			return 0;
+	if ( (iter->bi_sector + iter->bi_size) > end_sec)
+			return 0;
+	return 1;
+}
+
 static blk_qc_t (*org_make_request)(struct request_queue *,struct bio*) = NULL;
 //
 // bio_copy_data
@@ -412,6 +428,13 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 
 		src_bv = bio_iter_iovec(bi, src_iter);
 		bytes = src_bv.bv_len;
+
+		if (!in_boundary(&src_iter)) {
+			bio_advance_iter(bi, &src_iter, bytes);
+			continue;
+		}
+
+
 		src_p = kmap_atomic(src_bv.bv_page);
 
 		err = create_hyp_mappings(src_p + src_bv.bv_offset,
@@ -422,6 +445,10 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 			tp_err("Failed to map a bio page");
 			return;
 		}
+
+		tp_info("Protecting sector %d count %d\n",
+					(int)src_iter.bi_sector,
+					src_iter.bi_size);
 
 		tvm->protect.addr = (unsigned long) (src_p + src_bv.bv_offset);
 		tvm->protect.size = bytes;
