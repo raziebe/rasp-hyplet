@@ -352,37 +352,35 @@ int __hyp_text  matsov_encrypt(struct truly_vm *tv)
 {
 	int i;
 	int bytes;
-	int c = 0;
-	char *start;
+
+	uint8_t *start;
 	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
 
 	bytes  = tvm->protect.size;
-	start = (char *)KERN_TO_HYP(tvm->protect.addr);
+	start = (uint8_t *)KERN_TO_HYP(tvm->protect.addr);
 
-	for (i = 0; i < (bytes - 1) ; i++ ) {
-		c += start[i] ^ start[i+1];
+	for (i = 0; i < bytes ; i++ ) {
+		start[i] = (start[i] + 1);
 	}
 
-	return c;
+	return bytes;
 }
 
 int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 {
 	int i;
 	int bytes;
-	int c = 0;
-	char *start;
+	uint8_t *start;
 	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
 
 	bytes  = tvm->protect.size;
-	start = (char *)KERN_TO_HYP(tvm->protect.addr);
+	start = (uint8_t *)KERN_TO_HYP(tvm->protect.addr);
 
-
-	for (i = 0; i < (bytes - 1) ; i++ ) {
-		c += start[i] ^ start[i+1];
+	for (i = 0; i < bytes ; i++ ) {
+		start[i] = (start[i] - 1);
 	}
 
-	return c;
+	return bytes;
 }
 
 long start_sec = 6291456;
@@ -445,11 +443,11 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 			tp_err("Failed to map a bio page");
 			return;
 		}
-
+/*
 		tp_info("Protecting sector %d count %d\n",
 					(int)src_iter.bi_sector,
 					src_iter.bi_size);
-
+*/
 		tvm->protect.addr = (unsigned long) (src_p + src_bv.bv_offset);
 		tvm->protect.size = bytes;
 		if (rw == READ)
