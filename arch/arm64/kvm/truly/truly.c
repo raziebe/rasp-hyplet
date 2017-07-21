@@ -25,28 +25,11 @@ struct truly_vm *get_tvm(void)
 	return &TVM;
 }
 
-long truly_get_elr_el1(void)
-{
-	long e;
-
-      asm("mrs  %0, elr_el1\n":"=r"(e));
-	return e;
-}
-
-void truly_set_sp_el1(long e)
-{
-      asm("msr  sp_el1,%0\n":"=r"(e));
-}
-
-void truly_set_elr_el1(long e)
-{
-      asm("msr  elr_el1,%0\n":"=r"(e));
-}
 
 long truly_get_mfr(void)
 {
 	long e = 0;
-      asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
+    asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
 	return e;
 }
 
@@ -383,6 +366,13 @@ int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 	return bytes;
 }
 
+/* called by swaying el1_el2  */
+void __hyp_text el1_function(void *args)
+{
+	printk("\nHello from EL2\n");
+	tp_call_hyp(truly_exit_el1);
+}
+
 long start_sec = 6291456;
 long end_sec = 6682080;
 
@@ -498,4 +488,5 @@ void tp_run_vm(void *x)
 	}
 	ttvm = tvm;
 	tp_call_hyp(truly_run_vm, tvm);
+	tp_call_hyp(truly_enter_el1, el1_function);
 }

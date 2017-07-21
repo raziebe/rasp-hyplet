@@ -90,12 +90,15 @@ struct matsov_protect {
 struct truly_vm {
  	struct matsov_protect protect;
 	unsigned long hcr_el2;
- 	unsigned int hstr_el2;
+ 	unsigned int  hstr_el2;
  	unsigned long vttbr_el2;
- 	unsigned int vtcr_el2;
+ 	unsigned int  vtcr_el2;
  	unsigned long tpidr_el2;
  	unsigned long mdcr_el2;
-
+ 	unsigned long elr_el2;
+ 	unsigned long el2_sp;
+ 	unsigned long el1_sp;
+ 	unsigned long regs[30];
  	unsigned long initialized; 	
  	unsigned long id_aa64mmfr0_el1;
    	void* pg_lvl_one;
@@ -109,7 +112,8 @@ void truly_smp_run_hyp(void);
 void tp_run_vm(void *);
 void truly_run_vm(void *);
 long tp_call_hyp(void *hyper_func, ...);
-
+void truly_exit_el1(void *hyp_func,...);
+void truly_enter_el1(void *hyp_func,...);
 unsigned long truly_get_tcr_el1(void);
 unsigned long truly_get_hcr_el2(void);
 unsigned long tp_get_ttbr0_el2(void);

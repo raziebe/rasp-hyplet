@@ -24,46 +24,50 @@
 ENDPROC(\label)
 .endm
 
-
 .macro save_registers
-	push x0,x1
-	push x2,x3
-	push x4,x5
-	push x6,x7
-	push x8,x9
-	push x10,x11
-	push x12,x13
-	push x14,x15
-	push x16,x17
-	push x18,x19
-	push x20,x21
-	push x22,x23
-	push x24,x25
-	push x26,x27
-	push x28,x29
-	mrs x28,nzcv
-	push x30,x28
+
+	mrs	 x0, 	 tpidr_el2
+	add  x0,x0,   #TP_REGS
+	stp	 x1,x2,  [x0]
+	stp  x2,x3,  [x0 , #16]
+	stp  x4,x5,  [x0 , #32]
+	stp  x6,x7,  [x0 , #48]
+	stp  x8,x9,  [x0 , #64]
+	stp  x10,x11,[x0 , #80]
+	stp x12,x13, [x0 , #96]
+	stp x14,x15, [x0 , #112]
+	stp x16,x17, [x0 , #128]
+	stp x18,x19, [x0 , #144]
+	stp x20,x21, [x0 , #160]
+	stp x22,x23, [x0 , #176]
+	stp x24,x25, [x0 , #192]
+	stp x26,x27, [x0 , #208]
+	stp x28,x29, [x0 , #224]
+	str	x30,     [x0,  #232]
 .endm
 
 
 .macro restore_registers
-	pop x30,x28
-	msr nzcv,x28
-	pop x28,x29
-	pop x26,x27
-	pop x24,x25
-	pop x22,x23
-	pop x20,x21
-	pop x18,x19
-	pop x16,x17
-	pop x14,x15
-	pop x12,x13
-	pop x10,x11
-	pop x8,x9
-	pop x6,x7
-	pop x4,x5
-	pop x2,x3
-	pop x0,x1
+	// restore stack pointer
+	mrs	 x0, 	 tpidr_el2
+	add  x0,x0,   #TP_REGS
+	ldp	 x1,x2,  [x0]
+	ldp  x2,x3,  [x0 , #16]
+	ldp  x4,x5,  [x0 , #32]
+	ldp  x6,x7,  [x0 , #48]
+	ldp  x8,x9,  [x0 , #64]
+	ldp  x10,x11,[x0 , #80]
+	ldp x12,x13, [x0 , #96]
+	ldp x14,x15, [x0 , #112]
+	ldp x16,x17, [x0 , #128]
+	ldp x18,x19, [x0 , #144]
+	ldp x20,x21, [x0 , #160]
+	ldp x22,x23, [x0 , #176]
+	ldp x24,x25, [x0 , #192]
+	ldp x26,x27, [x0 , #208]
+	ldp x28,x29, [x0 , #224]
+	ldr	x30,     [x0,  #232]
+
 .endm
 
 EL1_sync:
@@ -152,6 +156,52 @@ ENTRY(truly_set_vectors)
 	ret
 ENDPROC(truly_set_vectors)
 
+/* clobber list:x2
+ * x0  - function pointer to call in EL1
+ * x1:    opaque data to pass to EL1
+*/
+ENTRY(truly_enter_el1)
+
+	pop	lr, xzr // get the stashed lr
+
+	push x0,x1
+
+	save_registers				// user's stuff
+	mrs	 x0, tpidr_el2
+
+
+// save el1 stack pointer
+	mrs	x1, sp_el1
+	str	x1,[x0, #TP_EL1_SP] // store SP2 position
+
+// save user PC
+	mrs   x1, elr_el2
+	str   x1,[x0, #TP_ELR_EL2]
+// prepare to return
+	pop x0,x1
+	msr    elr_el2, x0	// set new el1 return address
+	mov    x0, x1			// prepare arguments
+
+	eret //	will return to the new function
+ENDPROC(truly_enter_el1)
+
+/*
+ * user calls HVC at the end the function
+*/
+ENTRY(truly_exit_el1)
+	mrs	x0, tpidr_el2
+
+	ldr   	x1, [x0, #TP_EL1_SP]
+	msr	sp_el1,x1
+
+	ldr   	x1, [x0, #TP_ELR_EL2] // get user's last PC
+	msr 	elr_el2,x1
+
+	restore_registers
+	eret
+ENDPROC(truly_exit_el1)
+
+
 ENTRY(tp_call_hyp)
         hvc	#0
         ret
@@ -183,10 +233,6 @@ ENTRY(truly_run_vm)
     ldr     x1, [x0, #TP_VTTBR_EL2]
     kern_hyp_va x1
     msr vttbr_el2, x1
-
-    ldr		x1, [x0, #TP_MDCR_EL2]
-	kern_hyp_va x1
-	msr		mdcr_el2, x1
 
 	mov	lr,x4
 	eret
