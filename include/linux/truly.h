@@ -102,8 +102,15 @@ struct truly_vm {
  	unsigned long initialized; 	
  	unsigned long id_aa64mmfr0_el1;
    	void* pg_lvl_one;
-
+   	char print_buf[1024];
 } __attribute__ ((aligned (8)));
+
+static inline struct truly_vm *el2_get_tvm(void)
+{
+	struct truly_vm *tv;
+    asm("mrs %0,tpidr_el2\n":"=r"(tv));
+	return tv;
+}
 
 extern char __truly_vectors[];
 int truly_init(void);
@@ -120,6 +127,8 @@ unsigned long tp_get_ttbr0_el2(void);
 void truly_set_vectors(unsigned long vbar_el2);
 unsigned long truly_get_vectors(void);
 int create_hyp_mappings(void *, void *);
+void __hyp_text el2_sprintf(const char *fmt, ...);
+int __hyp_text el2_printk(const char *fmt, ...);
 
 #define tp_info(fmt, ...) \
 	pr_info("truly %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)

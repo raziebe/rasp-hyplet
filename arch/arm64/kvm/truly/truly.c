@@ -20,12 +20,6 @@
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
 
-struct truly_vm *get_tvm(void)
-{
-	return &TVM;
-}
-
-
 long truly_get_mfr(void)
 {
 	long e = 0;
@@ -335,7 +329,6 @@ int __hyp_text  matsov_encrypt(struct truly_vm *tv)
 {
 	int i;
 	int bytes;
-
 	uint8_t *start;
 	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
 
@@ -352,12 +345,14 @@ int __hyp_text  matsov_encrypt(struct truly_vm *tv)
 int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 {
 	int i;
-	int bytes;
+	unsigned long long bytes;
 	uint8_t *start;
 	struct truly_vm *tvm = (struct truly_vm *)KERN_TO_HYP(tv);
 
 	bytes  = tvm->protect.size;
 	start = (uint8_t *)KERN_TO_HYP(tvm->protect.addr);
+
+	el2_sprintf("EL2: %s bytes=%lld  start=%p\n", __func__ ,bytes,start);
 
 	for (i = 0; i < bytes ; i++ ) {
 		start[i] = (start[i] - 1);
@@ -367,11 +362,63 @@ int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 }
 
 /* called by swaying el1_el2  */
-void __hyp_text el1_function(void *args)
+void el1_function(void *args)
 {
 	printk("\nHello from EL2\n");
 	tp_call_hyp(truly_exit_el1);
 }
+
+int __hyp_text el2_vsprintf(char *buf, const char *fmt, va_list args)
+{
+	return vsnprintf(buf, INT_MAX, fmt, args);
+}
+
+int __hyp_text is_hyp(void)
+{
+        u64 el;
+        asm("mrs %0,CurrentEL" : "=r" (el));
+        return el == CurrentEL_EL2;
+}
+
+
+void __hyp_text el2_memcpy(char *dst,const char *src,int bytes)
+{
+	int i = 0;
+	for (;i < bytes ; i++)
+		dst[i] = src[i];
+}
+/*
+ * Executed in EL2
+ */
+void __hyp_text el2_sprintf(const char *fmt, ...)
+{
+	va_list args;
+	char *buf;
+	int printed;
+	struct truly_vm *tvm = el2_get_tvm();
+
+	buf =  (char *)(&tvm->print_buf[0]);
+
+	va_start(args, fmt);
+	printed = el2_vsprintf(buf, fmt, args);
+	va_end(args);
+}
+
+void __el1_printk(const char *fmt, ...)
+{
+	extern int puts(const char *s);
+	char printf_buf[512];
+	va_list args;
+
+	int printed;
+
+	va_start(args, fmt);
+	printed = vsprintf(printf_buf, fmt, args);
+	va_end(args);
+	printk(printf_buf);
+	tp_call_hyp(truly_exit_el1);
+}
+
 
 long start_sec = 6291456;
 long end_sec = 6682080;
@@ -444,7 +491,7 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 			tp_call_hyp( matsov_decrypt ,tvm);
 		else
 			tp_call_hyp( matsov_encrypt ,tvm);
-
+		printk(tvm->print_buf);
 		bio_advance_iter(bi, &src_iter, bytes);
 	}
 }
@@ -473,14 +520,49 @@ int truly_add_hook(struct gendisk *disk)
 	return 0;
 }
 
+#define MLK(b, t) b, t, ((t) - (b)) >> 10
+#define MLM(b, t) b, t, ((t) - (b)) >> 20
+#define MLG(b, t) b, t, ((t) - (b)) >> 30
+#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
 
 void tp_run_vm(void *x)
 {
+	int err;
 	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
 
 	truly_map_tvm(); // debug
+
+    printk("TP mappings:\n"
+                       "\t  fixed   : 0x%16lx - 0x%16lx   (%6ld KB) won't map\n"
+                      "\t  PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
+                      "\t  modules : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
+                      "\t  memory  : 0x%16lx - 0x%16lx   (%6ld MB) mapped\n"
+                      "\t  .init : 0x%p" " - 0x%p" "   (%6ld KB) won't map\n"
+                      "\t  .text : 0x%p" " - 0x%p" "   (%6ld KB) won't map\n"
+                      "\t  .data : 0x%p" " - 0x%p" "   (%6ld KB) map\n",
+                      MLK(FIXADDR_START, FIXADDR_TOP),
+                      MLM(PCI_IO_START, PCI_IO_END),
+                      MLM(MODULES_VADDR, MODULES_END),
+                      MLM(PAGE_OFFSET, (unsigned long)high_memory),
+                      MLK_ROUNDUP(__init_begin, __init_end),
+                      MLK_ROUNDUP(_text, _etext),
+                      MLK_ROUNDUP(_sdata, _edata));
+
+
+	err = create_hyp_mappings( _sdata ,_edata );
+	if (err){
+		tp_info("Failed to map kernel .data");
+		return;
+	}
+
+	err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
+	if (err){
+		tp_info("Failed to map kernel addr");
+		return;
+	}
+
 	vbar_el2_current = truly_get_vectors();
 	if (vbar_el2 != vbar_el2_current) {
 		tp_info("vbar_el2 should restore\n");
@@ -488,5 +570,4 @@ void tp_run_vm(void *x)
 	}
 	ttvm = tvm;
 	tp_call_hyp(truly_run_vm, tvm);
-	tp_call_hyp(truly_enter_el1, el1_function);
 }
