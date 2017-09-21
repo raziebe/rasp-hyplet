@@ -175,5 +175,7 @@ int main(void)
   DEFINE(TP_REGS ,  offsetof(struct truly_vm,  regs));
   DEFINE(TP_EL2_SP, offsetof(struct truly_vm,  el2_sp));
   DEFINE(TP_EL1_SP, offsetof(struct truly_vm,  el1_sp));
+//  DEFINE(TP_ICH_MISR_EL2, offsetof(struct truly_vm, ich_misr_el2));
+  DEFINE(TP_ICH_HCR_EL2, offsetof(struct truly_vm, ich_hcr_el2));
   return 0;
 }

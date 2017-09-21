@@ -10,11 +10,13 @@
 #include <asm/kvm_mmu.h>
 #include <asm/alternative.h>
 #include <asm/cpufeature.h>
+#include <linux/irqchip/arm-gic-v3.h>
 
 
 .text
 .pushsection	.hyp.text, "ax" // borrow  hyp.text
 .align	PAGE_SHIFT
+
 
 .macro invalid_vector   label,num
 .align 7
@@ -177,6 +179,7 @@ ENTRY(truly_enter_el1)
 // save user PC
 	mrs   x1, elr_el2
 	str   x1,[x0, #TP_ELR_EL2]
+
 // prepare to return
 	pop x0,x1
 	msr    elr_el2, x0	// set new el1 return address
@@ -184,6 +187,19 @@ ENTRY(truly_enter_el1)
 
 	eret //	will return to the new function
 ENDPROC(truly_enter_el1)
+
+
+/*
+ * Call into the vgic backend for state saving
+ */
+ENTRY(get_vgic_ver)
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+        mov     x0,#2
+alternative_else
+		mov x0,#3
+alternative_endif
+	ret
+ENDPROC(get_vgic_ver)
 
 /*
  * user calls HVC at the end the function
@@ -207,22 +223,34 @@ ENTRY(tp_call_hyp)
         ret
 ENDPROC(tp_call_hyp)
 
+ENTRY(route_to_el2)
+		mov		w1, #0x1
+		mov		x0, #1
+		lsl		w0, w0, #31
+		orr		x0, x0, x1
+		orr		x0, x0, #16
+		msr		hcr_el2, x0
+  		ret
+ENDPROC(route_to_el2)
 
 
 ENTRY(truly_run_vm)
 
 	pop	lr, xzr
 
+	push x0,x1
+	push x3,x4
+
 	mov	x4, lr		// save the link register of EL1 before losing it.
 
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-	ldr	x1, [x0, #TP_HCR_EL2]
+	ldr		x1, [x0, #TP_HCR_EL2]
 	kern_hyp_va x1
     msr     hcr_el2, x1
 
- 	ldr x1, [x0, #TP_HSTR_EL2]
+ 	ldr 	x1, [x0, #TP_HSTR_EL2]
 	kern_hyp_va x1
     msr hstr_el2, x1
 
@@ -235,8 +263,23 @@ ENTRY(truly_run_vm)
     msr vttbr_el2, x1
 
 	mov	lr,x4
+
+	pop x3,x4
+	pop x0,x1
+
 	eret
 ENDPROC(truly_run_vm)
+
+EL1_64_irq:
+	push 	x0,x1
+	mov		w1, #0x1
+	mov		x0, #1
+	lsl		x0, x0, #31
+	orr		x0, x0, x1
+	msr		hcr_el2, x0
+	pop		x0,x1
+	eret
+ENDPROC(EL1_64_irq)
 
 
 // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CHDEEDDC.html
@@ -253,7 +296,7 @@ ENTRY(__truly_vectors)
         invalid_vector  EL2_error_invalidELspx,#8               // Error EL2h
 
         ventry  		EL1_sync                        			// Synchronous 64-bit EL1
-        invalid_vector  EL1_64_irq_invalid ,#18    				// IRQ 64-bit EL1
+        ventry  		EL1_64_irq
         invalid_vector  EL1_fiq_invalid, #9                // FIQ 64-bit EL1
         invalid_vector  EL1_error_invalid ,#10             // Error 64-bit EL1
 

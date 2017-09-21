@@ -20,6 +20,8 @@
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
 
+
+
 long truly_get_mfr(void)
 {
 	long e = 0;
@@ -264,6 +266,8 @@ static void init_procfs(void)
 	    proc_create_data("truly_stats", O_RDWR, NULL, &proc_ops, NULL);
 }
 
+#define TP_HCR_GUEST_FLAGS (HCR_IMO| HCR_RW | HCR_VM)
+//#define TP_HCR_GUEST_FLAGS ( /* HCR_IMO |*/ HCR_GUEST_FLAGS )
 
 /*
  * construct page table
@@ -294,7 +298,7 @@ int truly_init(void)
 	_tvm->hstr_el2 = 0;
 
 	/* B4-1583 */
-	_tvm->hcr_el2 = (HCR_RW | HCR_VM);
+	_tvm->hcr_el2 = TP_HCR_GUEST_FLAGS;
 	_tvm->mdcr_el2 = 0x00;
 
 	for_each_possible_cpu(cpu) {
@@ -509,7 +513,9 @@ int truly_add_hook(struct gendisk *disk)
 	if (strcmp(disk->disk_name,"vda"))
 			return -1;
 
-	tp_info("hook disk %s\n",disk->disk_name);
+	tp_info("skip hook disk %s\n",disk->disk_name);
+	return 1;
+
 	q = disk->queue;
 	if (q == NULL){
 		tp_err("failed to find a queue");
@@ -568,6 +574,20 @@ void tp_run_vm(void *x)
 		tp_info("vbar_el2 should restore\n");
 		truly_set_vectors(vbar_el2);
 	}
+
 	ttvm = tvm;
-	tp_call_hyp(truly_run_vm, tvm);
+	tvm->ich_hcr_el2 = 1;
+	tp_info("vgic ver %lx\n",
+				tp_call_hyp(get_vgic_ver));
+
+	tp_call_hyp(truly_run_vm, tvm, NULL);
+
+}
+
+void tp_trigger_el2(void)
+{
+	struct truly_vm *tvm = this_cpu_ptr(&TVM);
+	if (tvm->initialized){
+		tp_call_hyp(route_to_el2, NULL, NULL);
+	}
 }

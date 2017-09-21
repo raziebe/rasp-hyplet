@@ -6,7 +6,7 @@
  *		Will Deacon <will.deacon@arm.com>
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
+ * it under the terms of the GNU General Publicf License version 2 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
@@ -187,6 +187,8 @@ tsk	.req	x28		// current thread_info
 	ldr	x1, [x1, #:lo12:handle_arch_irq]
 	mov	x0, sp
 	blr	x1
+// test if hyp vector is set and if so then turn it back on
+	bl  tp_trigger_el2
 	.endm
 
 	.text
@@ -357,7 +359,6 @@ el1_irq:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_off
 #endif
-
 	irq_handler
 
 #ifdef CONFIG_PREEMPT

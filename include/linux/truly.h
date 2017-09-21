@@ -70,6 +70,8 @@
 #define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 
+#define TP_HCR_GUEST_FLAGS 	(HCR_IMO| HCR_RW | HCR_VM)
+
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
 
@@ -98,6 +100,15 @@ struct truly_vm {
  	unsigned long elr_el2;
  	unsigned long el2_sp;
  	unsigned long el1_sp;
+ 	unsigned long ich_hcr_el2;
+ /*	unsigned long ich_vmcr_el2; control VM */
+
+ /* 	unsigned long ich_eisr_el2;  end of interrupt status register */
+/* 	unsigned long ich_misr_el2; maintenance ISR */
+/* 	ICH_ELSR_EL2 */
+/*	ICH_HCR_EL2, xzr
+	x21, ICH_VTR_EL2
+*/
  	unsigned long regs[30];
  	unsigned long initialized; 	
  	unsigned long id_aa64mmfr0_el1;
@@ -129,6 +140,9 @@ unsigned long truly_get_vectors(void);
 int create_hyp_mappings(void *, void *);
 void __hyp_text el2_sprintf(const char *fmt, ...);
 int __hyp_text el2_printk(const char *fmt, ...);
+long get_vgic_ver(void);
+void route_to_el2(void);
+void unroute_to_el2(void);
 
 #define tp_info(fmt, ...) \
 	pr_info("truly %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)
