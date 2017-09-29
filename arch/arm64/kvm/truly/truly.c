@@ -310,7 +310,7 @@ int truly_init(void)
 	_tvm->hstr_el2 = 0;
 
 	/* B4-1583 */
-	_tvm->hcr_el2 =  HCR_RW | HCR_VM ;
+	_tvm->hcr_el2 =  TP_HCR_GUEST_FLAGS;
 	_tvm->mdcr_el2 = 0x00;
 
 	for_each_possible_cpu(cpu) {
@@ -595,8 +595,8 @@ void tp_run_vm(void *x)
 // call after gic_handle_irq
 void tp_trigger_el2(void)
 {
-//	struct truly_vm *tvm = this_cpu_ptr(&TVM);
-//	if (tvm->initialized){
-//		tp_call_hyp(route_to_el2, NULL, NULL);
-//	}
+	struct truly_vm *tvm = this_cpu_ptr(&TVM);
+	if (tvm->initialized){
+		tp_call_hyp(route_to_el2, NULL, NULL);
+	}
 }
