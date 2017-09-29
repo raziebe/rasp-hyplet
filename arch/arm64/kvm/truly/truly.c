@@ -592,6 +592,7 @@ void tp_run_vm(void *x)
 	tp_call_hyp(truly_run_vm, tvm, NULL);
 }
 
+// call after gic_handle_irq
 void tp_trigger_el2(void)
 {
 //	struct truly_vm *tvm = this_cpu_ptr(&TVM);
