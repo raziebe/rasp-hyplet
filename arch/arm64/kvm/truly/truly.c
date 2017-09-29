@@ -16,6 +16,7 @@
 #include <asm/fixmap.h>
 #include <asm/memory.h>
 #include <linux/blkdev.h>
+#include <asm/page.h>
 
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
@@ -52,7 +53,20 @@ void create_level_three(struct page *pg, long *addr)
 			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |	/* leave stage 1 un-changed see 1795 */
 		   	 DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
 
+		if ( (*addr) == 0x000000001A000000LL) {
+			long z = page_to_phys(empty_zero_page);
+
+			printk("XXXX Crashing addr = %lx zpg=%lx\n",
+					*addr
+					,z )  ;
+
+			l3_descriptor[i] = (DESC_AF) | (0b11 << DESC_SHREABILITY_SHIFT) |
+				(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |
+			   	 DESC_TABLE_BIT | DESC_VALID_BIT | (long)z;
+		}
+
 		(*addr) += PAGE_SIZE;
+
 	}
 	kunmap(pg);
 }
@@ -266,9 +280,6 @@ static void init_procfs(void)
 	    proc_create_data("truly_stats", O_RDWR, NULL, &proc_ops, NULL);
 }
 
-#define TP_HCR_GUEST_FLAGS (HCR_IMO| HCR_RW | HCR_VM)
-//#define TP_HCR_GUEST_FLAGS ( /* HCR_IMO |*/ HCR_GUEST_FLAGS )
-
 /*
  * construct page table
 */
@@ -282,6 +293,7 @@ int truly_init(void)
 	long id_aa64mmfr0_el1;
 	struct truly_vm *_tvm;
 	int cpu = 0;
+
 
 	id_aa64mmfr0_el1 = truly_get_mfr();
 	tcr_el1 = truly_get_tcr_el1();
@@ -298,7 +310,7 @@ int truly_init(void)
 	_tvm->hstr_el2 = 0;
 
 	/* B4-1583 */
-	_tvm->hcr_el2 = TP_HCR_GUEST_FLAGS;
+	_tvm->hcr_el2 =  HCR_RW | HCR_VM ;
 	_tvm->mdcr_el2 = 0x00;
 
 	for_each_possible_cpu(cpu) {
@@ -565,7 +577,7 @@ void tp_run_vm(void *x)
 
 	err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
 	if (err){
-		tp_info("Failed to map kernel addr");
+		tp_info("Failed to map kernel address");
 		return;
 	}
 
@@ -577,17 +589,13 @@ void tp_run_vm(void *x)
 
 	ttvm = tvm;
 	tvm->ich_hcr_el2 = 1;
-	tp_info("vgic ver %lx\n",
-				tp_call_hyp(get_vgic_ver));
-
 	tp_call_hyp(truly_run_vm, tvm, NULL);
-
 }
 
 void tp_trigger_el2(void)
 {
-	struct truly_vm *tvm = this_cpu_ptr(&TVM);
-	if (tvm->initialized){
-		tp_call_hyp(route_to_el2, NULL, NULL);
-	}
+//	struct truly_vm *tvm = this_cpu_ptr(&TVM);
+//	if (tvm->initialized){
+//		tp_call_hyp(route_to_el2, NULL, NULL);
+//	}
 }
