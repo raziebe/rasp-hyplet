@@ -525,14 +525,13 @@ int truly_add_hook(struct gendisk *disk)
 	if (strcmp(disk->disk_name,"vda"))
 			return -1;
 
-	tp_info("skip hook disk %s\n",disk->disk_name);
-	return 1;
-
 	q = disk->queue;
 	if (q == NULL){
 		tp_err("failed to find a queue");
 		return -1;
 	}
+
+	tp_info("set hook disk %s\n",disk->disk_name);
 	org_make_request = q->make_request_fn;
 	q->make_request_fn = truly_make_request_fn;
 	return 0;
