@@ -514,7 +514,9 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 
 blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bi)
 {
+	preempt_disable();
 	bio_map_data_to_hyp(this_cpu_ptr(&TVM), bi);
+	preempt_enable();
 	return org_make_request(q, bi);
 }
 
