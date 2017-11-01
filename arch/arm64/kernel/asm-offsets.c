@@ -28,6 +28,8 @@
 #include <asm/suspend.h>
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
+#include <linux/arm-smccc.h>
+#include <linux/truly.h>
 
 int main(void)
 {
@@ -163,5 +165,16 @@ int main(void)
   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
 #endif
+
+  DEFINE(TP_HCR_EL2, offsetof(struct truly_vm,  hcr_el2));
+  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
+  DEFINE(TP_HSTR_EL2 , offsetof(struct truly_vm,  hstr_el2));
+  DEFINE(TP_VTTBR_EL2 , offsetof(struct truly_vm,  vttbr_el2));
+  DEFINE(TP_VTCR_EL2 , offsetof(struct truly_vm,  vtcr_el2));
+  DEFINE(TP_REGS ,  offsetof(struct truly_vm,  regs));
+  DEFINE(TP_EL2_SP, offsetof(struct truly_vm,  el2_sp));
+  DEFINE(TP_EL1_SP, offsetof(struct truly_vm,  el1_sp));
+//  DEFINE(TP_ICH_MISR_EL2, offsetof(struct truly_vm, ich_misr_el2));
+  DEFINE(TP_ICH_HCR_EL2, offsetof(struct truly_vm, ich_hcr_el2));
   return 0;
 }

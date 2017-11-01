@@ -541,7 +541,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-static int __create_hyp_mappings(pgd_t *pgdp,
+int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot)
 {

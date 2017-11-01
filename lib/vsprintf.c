@@ -40,6 +40,7 @@
 
 #include <linux/string_helpers.h>
 #include "kstrtox.h"
+#define __hyp_text __section(.hyp.text) notrace
 
 /**
  * simple_strtoull - convert a string to an unsigned long long
@@ -114,7 +115,7 @@ long long simple_strtoll(const char *cp, char **endp, unsigned int base)
 }
 EXPORT_SYMBOL(simple_strtoll);
 
-static noinline_for_stack
+static noinline_for_stack __hyp_text
 int skip_atoi(const char **s)
 {
 	int i = 0;
@@ -390,7 +391,7 @@ struct printf_spec {
 	s16	precision;	/* # of digits/chars */
 };
 
-static noinline_for_stack
+static noinline_for_stack __hyp_text
 char *number(char *buf, char *end, unsigned long long num,
 	     struct printf_spec spec)
 {
@@ -509,7 +510,7 @@ char *number(char *buf, char *end, unsigned long long num,
 	return buf;
 }
 
-static noinline_for_stack
+static noinline_for_stack __hyp_text
 char *string(char *buf, char *end, const char *s, struct printf_spec spec)
 {
 	int len, i;
@@ -1528,7 +1529,7 @@ int kptr_restrict __read_mostly;
  * function pointers are really function descriptors, which contain a
  * pointer to the real address.
  */
-static noinline_for_stack
+static noinline_for_stack __hyp_text
 char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 	      struct printf_spec spec)
 {
@@ -1706,8 +1707,7 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
  * @precision: precision of a number
  * @qualifier: qualifier of a number (long, size_t, ...)
  */
-static noinline_for_stack
-int format_decode(const char *fmt, struct printf_spec *spec)
+int __hyp_text format_decode(const char *fmt, struct printf_spec *spec)
 {
 	const char *start = fmt;
 
@@ -1909,17 +1909,21 @@ qualifier:
  *
  * If you're not already dealing with a va_list consider using snprintf().
  */
-int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+
+int __hyp_text vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
 	unsigned long long num;
 	char *str, *end;
 	struct printf_spec spec = {0};
+	void el2_memcpy(char *dst,const char *src,int bytes);
+	int is_hyp(void);
 
 	/* Reject out-of-range values early.  Large positive sizes are
 	   used for unknown buffer sizes. */
-	if (WARN_ON_ONCE(size > INT_MAX))
-		return 0;
-
+	if (!is_hyp()){
+	    if (WARN_ON_ONCE(size > INT_MAX))
+			return 0;
+	}
 	str = buf;
 	end = buf + size;
 
@@ -1930,8 +1934,10 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 	}
 
 	while (*fmt) {
+		int read ;
 		const char *old_fmt = fmt;
-		int read = format_decode(fmt, &spec);
+
+		read = format_decode(fmt, &spec);
 
 		fmt += read;
 
@@ -1941,7 +1947,10 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 			if (str < end) {
 				if (copy > end - str)
 					copy = end - str;
-				memcpy(str, old_fmt, copy);
+				if (is_hyp())
+					el2_memcpy(str,old_fmt,copy);
+				else
+					memcpy(str, old_fmt, copy);
 			}
 			str += read;
 			break;
