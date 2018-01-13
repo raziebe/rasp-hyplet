@@ -52,19 +52,6 @@ void create_level_three(struct page *pg, long *addr)
 			(0b11 << DESC_SHREABILITY_SHIFT) |
 			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |	/* leave stage 1 un-changed see 1795 */
 		   	 DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
-/*
-		if ( (*addr) == 0x000000001A000000LL) {
-			long z = page_to_phys(empty_zero_page);
-
-			printk("XXXX Crashing addr = %lx zpg=%lx\n",
-					*addr
-					,z )  ;
-
-			l3_descriptor[i] = (DESC_AF) | (0b11 << DESC_SHREABILITY_SHIFT) |
-				(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |
-			   	 DESC_TABLE_BIT | DESC_VALID_BIT | (long)z;
-		}
-*/
 		(*addr) += PAGE_SIZE;
 
 	}
@@ -84,20 +71,14 @@ void create_level_two(struct page *pg, long *addr)
 		return;
 	}
 
-	pg_lvl_three = alloc_pages(GFP_KERNEL | __GFP_ZERO, 9);
-	if (pg_lvl_three == NULL) {
-		printk("%s alloc page NULL\n", __func__);
-		return;
-	}
-
 	for (i = 0; i < PAGE_SIZE / (sizeof(long)); i++) {
 		// fill an entire 2MB of mappings
-		create_level_three(pg_lvl_three + i, addr);
+		pg_lvl_three = alloc_page(GFP_KERNEL | __GFP_ZERO);
+		create_level_three(pg_lvl_three , addr);
 		// calc the entry of this table
 		l2_descriptor[i] =
-		    (page_to_phys(pg_lvl_three + i)) | DESC_TABLE_BIT |
+		    (page_to_phys(pg_lvl_three)) | DESC_TABLE_BIT |
 		    DESC_VALID_BIT;
-
 		//tp_info("L2 IPA %lx\n", l2_descriptor[i]);
 	}
 
@@ -122,7 +103,7 @@ void create_level_one(struct page *pg, long *addr)
 		return;
 	}
 
-	for (i = 0; i < 8; i++) {
+	for (i = 0; i < 2; i++) {
 		get_page(pg_lvl_two + i);
 		create_level_two(pg_lvl_two + i, addr);
 		l1_descriptor[i] =
@@ -160,8 +141,6 @@ void create_level_zero(struct truly_vm *tvm, struct page *pg, long *addr)
 
 	tvm->pg_lvl_one = (void *) pg_lvl_one;
 
-	tp_info("L0 IPA %lx\n", l0_descriptor[0]);
-
 	kunmap(pg);
 
 }
@@ -195,9 +174,7 @@ unsigned long tp_create_pg_tbl(void *cxt)
 		tvm->vttbr_el2 = page_to_phys(pg_lvl_zero) | (vmid << 48);
 	else
 		tvm->vttbr_el2 =
-		    page_to_phys((struct page *) tvm->pg_lvl_one) | (vmid
-								     <<
-								     48);
+		    page_to_phys((struct page *) tvm->pg_lvl_one) | (vmid << 48);
 
 	return tvm->vttbr_el2;
 }
@@ -512,12 +489,13 @@ int truly_add_hook(struct gendisk *disk)
 	return 0;
 }
 
-#define MLK(b, t) b, t, ((t) - (b)) >> 10
-#define MLM(b, t) b, t, ((t) - (b)) >> 20
-#define MLG(b, t) b, t, ((t) - (b)) >> 30
-#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
+#define ul_virt_to_phys(x) (unsigned long)virt_to_phys((void*)x)
+#define MLK(b, t) (b), (t), (((t) - (b)) >> 10)
+#define PHYS_MLK(b, t) ul_virt_to_phys(b), ul_virt_to_phys(t), ((t) - (b)) >> 10
+#define PHYS_MLM(b, t) ul_virt_to_phys(b)>>20, ul_virt_to_phys(t)>>20, ((t) - (b)) >> 20
+#define PHYS_MLG(b, t) ul_virt_to_phys(b)>>30, ul_virt_to_phys(t)>>30, ((t) - (b)) >> 30
+#define PHYS_MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
 
-static int all_cpus_init = 0;
 
 void tp_run_vm(void *x)
 {
@@ -525,29 +503,28 @@ void tp_run_vm(void *x)
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
 
-	if (all_cpus_init)
-		return;
 	if (tvm->initialized)
 		return;
 	tvm->initialized = 1;
-	mb();
-	all_cpus_init = 1;
 	truly_map_tvm();
-    	printk("TP mappings:\n"
-                       "\t  fixed   : 0x%16lx - 0x%16lx   (%6ld KB) won't map\n"
-                      "\t  PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
-                      "\t  modules : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
-                      "\t  memory  : 0x%16lx - 0x%16lx   (%6ld MB) mapped\n"
-                      "\t  .init : 0x%p" " - 0x%p" "   (%6ld KB) won't map\n"
-                      "\t  .text : 0x%p" " - 0x%p" "   (%6ld KB) won't map\n"
-                      "\t  .data : 0x%p" " - 0x%p" "   (%6ld KB) map\n",
-                      MLK(FIXADDR_START, FIXADDR_TOP),
-                      MLM(PCI_IO_START, PCI_IO_END),
-                      MLM(MODULES_VADDR, MODULES_END),
-                      MLM(PAGE_OFFSET, (unsigned long)high_memory),
-                      MLK_ROUNDUP(__init_begin, __init_end),
-                      MLK_ROUNDUP(_text, _etext),
-                      MLK_ROUNDUP(_sdata, _edata));
+/*
+	printk("TP mappings:\n\t Start of RAM %lx MB\n"
+	       "\t  fixed  : %ld - %ld   (%ld MB) won't map\n"
+	        "\t  PCI I/O : %ld - %ld   (%ld MB) won't map\n"
+	        "\t  modules : %ld - %ld   (%ld MB) won't map\n"
+	        "\t  memory  : %ld - %ld   (%ld MB) mapped\n"
+	        "\t  .init : %p" " - %p" "   (%ld KB) won't map\n"
+	        "\t  .text : %p" " - %p" "   (%ld KB) won't map\n"
+	        "\t  .data : %p" " - %p" "   (%ld KB) map\n",
+	   (long)(PHYS_OFFSET >>20),
+	   	   PHYS_MLM(FIXADDR_START, FIXADDR_TOP),
+		   PHYS_MLM(PCI_IO_START, PCI_IO_END),
+		   PHYS_MLM(MODULES_VADDR, MODULES_END),
+		   PHYS_MLM(PAGE_OFFSET, (unsigned long)high_memory),
+		   PHYS_MLK_ROUNDUP(__init_begin, __init_end),
+		   PHYS_MLK_ROUNDUP(_text, _etext),
+		   PHYS_MLK_ROUNDUP(_sdata, _edata));
+*/
 
 	// up to here it is ok
 /*
@@ -564,17 +541,15 @@ void tp_run_vm(void *x)
 		return;
 	}
 */
-
 	vbar_el2_current = truly_get_vectors();
 	if (vbar_el2 != vbar_el2_current) {
 		tp_info("vbar_el2 should restore\n");
 		truly_set_vectors(vbar_el2);
 	}
-
 	ttvm = tvm;
 	tvm->ich_hcr_el2 = 1;
-	tp_info("VBAR_EL2 =%lx\n",vbar_el2_current);
 	tp_call_hyp(truly_run_vm, tvm, NULL);
+	tp_info("Truly ON\n");
 }
 
 // call after gic_handle_irq
