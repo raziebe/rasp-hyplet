@@ -5,8 +5,6 @@
 #include <linux/gfp.h>
 #include <linux/highmem.h>
 #include <linux/compiler.h>
-#include <linux/linkage.h>
-#include <linux/linkage.h>
 #include <linux/init.h>
 #include <asm/sections.h>
 #include <linux/proc_fs.h>
@@ -16,7 +14,7 @@
 #include <asm/fixmap.h>
 #include <asm/memory.h>
 #include <linux/blkdev.h>
-#include <asm/page.h>
+#include <asm/pgtable.h>
 
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
@@ -30,6 +28,7 @@ long truly_get_mfr(void)
 	return e;
 }
 
+#define USB_ADDR 0x3f980000
 //
 // alloc 512 * 4096  = 2MB 
 //
@@ -47,11 +46,22 @@ void create_level_three(struct page *pg, long *addr)
 	for (i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
 		/*
 		 * see page 1781 for details
+ 		 *  .leave stage 1 un-changed see 1795 
 		 */
 		l3_descriptor[i] = (DESC_AF) |
 			(0b11 << DESC_SHREABILITY_SHIFT) |
-			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |	/* leave stage 1 un-changed see 1795 */
+			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |
 		   	 DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
+#if 0		
+                if ( (*addr) == USB_ADDR) {
+                        long z = page_to_phys(virt_to_page(empty_zero_page));
+
+                        tp_info("Hide %lx zpg=%lx\n", *addr ,z);
+                        l3_descriptor[i] = (DESC_AF) | (0b11 << DESC_SHREABILITY_SHIFT) |
+                                (0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |
+                                 DESC_TABLE_BIT | DESC_VALID_BIT | (long)z;
+		}
+#endif		
 		(*addr) += PAGE_SIZE;
 
 	}
