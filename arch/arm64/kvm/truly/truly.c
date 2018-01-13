@@ -319,6 +319,7 @@ int truly_init(void)
 		}
 	}
 	init_procfs();
+	tp_info("Truly Registers intialized\n");
 	return 0;
 }
 
@@ -327,16 +328,12 @@ void truly_map_tvm(void)
 	int err;
 	struct truly_vm *tv = this_cpu_ptr(&TVM);
 
-	if (tv->initialized)
-		return;
 	err = create_hyp_mappings(tv, tv + 1);
 	if (err) {
 		tp_err("Failed to map tvm");
 	} else {
 		tp_info("Mapped tvm");
 	}
-	tv->initialized = 1;
-	mb();
 
 }
 
@@ -520,17 +517,22 @@ int truly_add_hook(struct gendisk *disk)
 #define MLG(b, t) b, t, ((t) - (b)) >> 30
 #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
 
+static int all_cpus_init = 0;
+
 void tp_run_vm(void *x)
 {
-	int err;
 	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
 
-	return;
-
-	truly_map_tvm(); // debug
-
+	if (all_cpus_init)
+		return;
+	if (tvm->initialized)
+		return;
+	tvm->initialized = 1;
+	mb();
+	all_cpus_init = 1;
+	truly_map_tvm();
     	printk("TP mappings:\n"
                        "\t  fixed   : 0x%16lx - 0x%16lx   (%6ld KB) won't map\n"
                       "\t  PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB) won't map\n"
@@ -547,19 +549,21 @@ void tp_run_vm(void *x)
                       MLK_ROUNDUP(_text, _etext),
                       MLK_ROUNDUP(_sdata, _edata));
 
-
+	// up to here it is ok
+/*
 	err = create_hyp_mappings( _sdata ,_edata );
 	if (err){
 		tp_info("Failed to map kernel .data");
 		return;
 	}
-
+*/
+/*
 	err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
 	if (err){
 		tp_info("Failed to map kernel address");
 		return;
 	}
-
+*/
 
 	vbar_el2_current = truly_get_vectors();
 	if (vbar_el2 != vbar_el2_current) {
@@ -569,6 +573,7 @@ void tp_run_vm(void *x)
 
 	ttvm = tvm;
 	tvm->ich_hcr_el2 = 1;
+	tp_info("VBAR_EL2 =%lx\n",vbar_el2_current);
 	tp_call_hyp(truly_run_vm, tvm, NULL);
 }
 

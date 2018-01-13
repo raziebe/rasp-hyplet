@@ -175,37 +175,30 @@ ENDPROC(route_to_el2)
 
 
 ENTRY(truly_run_vm)
-
+	
 	pop	lr, xzr
-
-	push x0,x1
-	push x3,x4
-
 	mov	x4, lr		// save the link register of EL1 before losing it.
-
+	
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-	ldr		x1, [x0, #TP_HCR_EL2]
-	kern_hyp_va x1
-    msr     hcr_el2, x1
+	msr	mdcr_el2, xzr
 
+	ldr	x1, [x0, #TP_HCR_EL2]
+    	msr     hcr_el2, x1
+	
  	ldr 	x1, [x0, #TP_HSTR_EL2]
-	kern_hyp_va x1
-    msr hstr_el2, x1
+   	msr 	hstr_el2, x1
 
-    ldr		x1, [x0, #TP_VTCR_EL2]
-	kern_hyp_va x1
+    	ldr	x1, [x0, #TP_VTCR_EL2]
 	msr	vtcr_el2, x1
-
-    ldr     x1, [x0, #TP_VTTBR_EL2]
-    kern_hyp_va x1
-    msr vttbr_el2, x1
+ 
+    	ldr     x1, [x0, #TP_VTTBR_EL2]
+    	msr 	vttbr_el2, x1
+	// Clear cntvoff for the host
+	msr	cntvoff_el2, xzr
 
 	mov	lr,x4
-
-	pop x3,x4
-	pop x0,x1
 
 	eret
 ENDPROC(truly_run_vm)
