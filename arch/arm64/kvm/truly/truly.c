@@ -335,7 +335,7 @@ int __hyp_text  matsov_encrypt(struct truly_vm *tv)
 	start = (uint8_t *)KERN_TO_HYP(tvm->protect.addr);
 
 	for (i = 0; i < bytes ; i++ ) {
-		start[i] = (start[i] + 1);
+		start[i] = 'y';
 	}
 
 	return bytes;
@@ -351,10 +351,11 @@ int __hyp_text  matsov_decrypt(struct truly_vm *tv)
 	bytes  = tvm->protect.size;
 	start = (uint8_t *)KERN_TO_HYP(tvm->protect.addr);
 
-	el2_sprintf("EL2: %s bytes=%lld  start=%p\n", __func__ ,bytes,start);
+//	el2_sprintf("EL2: %s bytes=%lld  start=%p\n", __func__ ,bytes,start);
 
 	for (i = 0; i < bytes ; i++ ) {
-		start[i] = (start[i] - 1);
+		start[i] = 'x';
+		//start[i] = (start[i] - 1);
 	}
 
 	return bytes;
@@ -396,22 +397,6 @@ void __hyp_text el2_sprintf(const char *fmt, ...)
 	va_end(args);
 }
 
-long start_sec = 6291456;
-long end_sec = 6682080;
-
-//
-// For the sake of POC I assume that IOs
-// do not cross boundaries
-//
-int in_boundary(struct bvec_iter* iter)
-{
-	if ( iter->bi_sector < start_sec )
-			return 0;
-	if ( (iter->bi_sector + iter->bi_size) > end_sec)
-			return 0;
-	return 1;
-}
-
 static blk_qc_t (*org_make_request)(struct request_queue *,struct bio*) = NULL;
 //
 // bio_copy_data
@@ -440,12 +425,6 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 		src_bv = bio_iter_iovec(bi, src_iter);
 		bytes = src_bv.bv_len;
 
-		if (!in_boundary(&src_iter)) {
-			bio_advance_iter(bi, &src_iter, bytes);
-			continue;
-		}
-
-
 		src_p = kmap_atomic(src_bv.bv_page);
 
 		err = create_hyp_mappings(src_p + src_bv.bv_offset,
@@ -456,11 +435,11 @@ void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
 			tp_err("Failed to map a bio page");
 			return;
 		}
-/*
-		tp_info("Protecting sector %d count %d\n",
-					(int)src_iter.bi_sector,
-					src_iter.bi_size);
-*/
+
+		tp_info("sect [%d %d]%d rw=%d \n",
+				(int)src_iter.bi_sector,
+				src_iter.bi_size,bytes,rw);
+
 		tvm->protect.addr = (unsigned long) (src_p + src_bv.bv_offset);
 		tvm->protect.size = bytes;
 		if (rw == READ)
@@ -484,15 +463,13 @@ int truly_add_hook(struct gendisk *disk)
 {
 	struct request_queue *q;
 
-	if (strcmp(disk->disk_name,"vda"))
-			return -1;
-
+	if (strcmp(disk->disk_name,"sda"))
+		return -1;
 	q = disk->queue;
 	if (q == NULL){
 		tp_err("failed to find a queue");
 		return -1;
 	}
-
 	tp_info("set hook disk %s\n",disk->disk_name);
 	org_make_request = q->make_request_fn;
 	q->make_request_fn = truly_make_request_fn;
@@ -505,10 +482,11 @@ int truly_add_hook(struct gendisk *disk)
 #define PHYS_MLM(b, t) ul_virt_to_phys(b)>>20, ul_virt_to_phys(t)>>20, ((t) - (b)) >> 20
 #define PHYS_MLG(b, t) ul_virt_to_phys(b)>>30, ul_virt_to_phys(t)>>30, ((t) - (b)) >> 30
 #define PHYS_MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
-
+int kernel_mapped = 0;
 
 void tp_run_vm(void *x)
 {
+//	int err;
 	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__truly_vectors);
 	unsigned long vbar_el2_current;
@@ -517,38 +495,22 @@ void tp_run_vm(void *x)
 		return;
 	tvm->initialized = 1;
 	truly_map_tvm();
-/*
-	printk("TP mappings:\n\t Start of RAM %lx MB\n"
-	       "\t  fixed  : %ld - %ld   (%ld MB) won't map\n"
-	        "\t  PCI I/O : %ld - %ld   (%ld MB) won't map\n"
-	        "\t  modules : %ld - %ld   (%ld MB) won't map\n"
-	        "\t  memory  : %ld - %ld   (%ld MB) mapped\n"
-	        "\t  .init : %p" " - %p" "   (%ld KB) won't map\n"
-	        "\t  .text : %p" " - %p" "   (%ld KB) won't map\n"
-	        "\t  .data : %p" " - %p" "   (%ld KB) map\n",
-	   (long)(PHYS_OFFSET >>20),
-	   	   PHYS_MLM(FIXADDR_START, FIXADDR_TOP),
-		   PHYS_MLM(PCI_IO_START, PCI_IO_END),
-		   PHYS_MLM(MODULES_VADDR, MODULES_END),
-		   PHYS_MLM(PAGE_OFFSET, (unsigned long)high_memory),
-		   PHYS_MLK_ROUNDUP(__init_begin, __init_end),
-		   PHYS_MLK_ROUNDUP(_text, _etext),
-		   PHYS_MLK_ROUNDUP(_sdata, _edata));
-*/
 
-	// up to here it is ok
 /*
+ *      Need for the constants of printk
 	err = create_hyp_mappings( _sdata ,_edata );
 	if (err){
 		tp_info("Failed to map kernel .data");
 		return;
 	}
-*/
-/*
-	err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
-	if (err){
-		tp_info("Failed to map kernel address");
-		return;
+
+	if (!kernel_mapped){
+		err = create_hyp_mappings( (void*)PAGE_OFFSET, high_memory);
+		if (err){
+			tp_info("Failed to map kernel address");
+			return;
+		}
+		kernel_mapped =1;
 	}
 */
 	vbar_el2_current = truly_get_vectors();
