@@ -1089,7 +1089,7 @@ static void alloc_behind_pages(struct bio *bio, struct r1bio *r1_bio)
 					GFP_NOIO);
 	if (unlikely(!bvecs))
 		return;
-
+// raz .cut data here
 	bio_for_each_segment_all(bvec, bio, i) {
 		bvecs[i] = *bvec;
 		bvecs[i].bv_page = alloc_page(GFP_NOIO);

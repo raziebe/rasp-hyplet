@@ -17,7 +17,6 @@
 #include <asm/pgtable.h>
 
 DEFINE_PER_CPU(struct truly_vm, TVM);
-struct truly_vm *ttvm; // debug
 make_request_fn*  org_make_request_fn;
 
 struct truly_bio {
@@ -407,22 +406,26 @@ static void tp_bio_end_io(struct bio* bio)
 	int i = 0;
 	struct bio_vec *bvec;
 	struct truly_bio *tpbio;
-	sector_t sector;
+	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 
 	tpbio = (struct truly_bio *)bio->bi_private;
 	if (tpbio == NULL)
 		panic("Insane truly IO\n");
-	sector = bio->bi_iter.bi_sector;
+	
 	if (bio_data_dir(bio) != READ)
 		panic("Insane IO dir\n");
-	printk("%d R sec %zd \n",i, sector);
 
 	bio_for_each_segment_all(bvec, bio, i) {
-		unsigned int len = bvec->bv_len;
-		char *s = kmap_atomic(bvec->bv_page);
-		memset(s + bvec->bv_offset,'1', bvec->bv_len);
-		sector += len >> 9;
+		int err;
+		char *s = (char *)kmap_atomic(bvec->bv_page) + bvec->bv_offset;
+		err = create_hyp_mappings(s, s + PAGE_SIZE);
+		if (err){
+			panic("failed to map to hypervisor\n");
+		}
 		kunmap_atomic(s);
+		tvm->protect.addr = (unsigned long)s;
+		tvm->protect.size = PAGE_SIZE;
+		tp_call_hyp( matsov_decrypt ,tvm);
 	}
 
 	bio->bi_end_io  = tpbio->org_bio_endio;
@@ -436,8 +439,7 @@ blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bio)
 {
 	int i = 0;
 	struct bio_vec *bvec;
-
-	sector_t sector = bio->bi_iter.bi_sector;
+	struct truly_vm *tvm = this_cpu_ptr(&TVM);
 
 	if (bio_data_dir(bio) == READ) {
 		struct truly_bio *tpbio = kmalloc(sizeof(struct truly_bio), GFP_NOIO); 	
@@ -447,21 +449,23 @@ blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bio)
 
 		bio->bi_private = tpbio;
 		bio->bi_end_io = tp_bio_end_io;
-		printk("sec %zd org_bio_endio=%p\n",
-				sector,		
-				tpbio->org_bio_endio);
 		return org_make_request_fn(q, bio);
 	}
 
-// WRITE PATH
-	bio_for_each_segment_all(bvec, bio, i) {
-		unsigned int len = bvec->bv_len;
 
-		sector = bio->bi_iter.bi_sector;
-		memset(kmap(bvec->bv_page) + bvec->bv_offset,'1', bvec->bv_len);
-		printk("%d W sec %zd \n",i, sector);
-		sector += len >> 9;
+	bio_for_each_segment_all(bvec, bio, i) {
+		int err;
+		char *s = (char *)kmap_atomic(bvec->bv_page) + bvec->bv_offset;
+		
+		err = create_hyp_mappings(s, s + PAGE_SIZE);
+		if (err){
+			panic("failed to map to hypervisor\n");
+		}
 		kunmap(bvec->bv_page);
+
+		tvm->protect.addr = (unsigned long)s;
+		tvm->protect.size = PAGE_SIZE;
+		tp_call_hyp( matsov_encrypt ,tvm);
 	}
 	return org_make_request_fn(q, bio);
 }
@@ -520,7 +524,6 @@ void tp_run_vm(void *x)
 		tp_info("vbar_el2 should restore\n");
 		truly_set_vectors(vbar_el2);
 	}
-	ttvm = tvm;
 	tvm->ich_hcr_el2 = 1;
 	tp_call_hyp(truly_run_vm, tvm, NULL);
 	tp_info("Truly ON\n");
