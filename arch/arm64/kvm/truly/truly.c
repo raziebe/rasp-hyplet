@@ -18,13 +18,18 @@
 
 DEFINE_PER_CPU(struct truly_vm, TVM);
 struct truly_vm *ttvm; // debug
+make_request_fn*  org_make_request_fn;
 
-
+struct truly_bio {
+	struct bio* bio;
+	bio_end_io_t		*org_bio_endio;
+	void *bi_private;
+};
 
 long truly_get_mfr(void)
 {
 	long e = 0;
-    asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
+    	asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
 	return e;
 }
 
@@ -397,81 +402,78 @@ void __hyp_text el2_sprintf(const char *fmt, ...)
 	va_end(args);
 }
 
-static blk_qc_t (*org_make_request)(struct request_queue *,struct bio*) = NULL;
-//
-// bio_copy_data
-//
-void bio_map_data_to_hyp(struct truly_vm* tvm, struct bio *bi)
+static void tp_bio_end_io(struct bio* bio)
 {
-	int rw;
-	struct bvec_iter src_iter;
-	struct bio_vec src_bv;
-	void *src_p;
-	unsigned bytes;
-	int err;
+	int i = 0;
+	struct bio_vec *bvec;
+	struct truly_bio *tpbio;
+	sector_t sector;
 
-	src_iter = bi->bi_iter;
+	tpbio = (struct truly_bio *)bio->bi_private;
+	if (tpbio == NULL)
+		panic("Insane truly IO\n");
+	sector = bio->bi_iter.bi_sector;
+	if (bio_data_dir(bio) != READ)
+		panic("Insane IO dir\n");
+	printk("%d R sec %zd \n",i, sector);
 
-	rw = bio_data_dir(bi);
-
-	while (1) {
-		if (!src_iter.bi_size) {
-			bi = bi->bi_next;
-			if (!bi)
-				break;
-			src_iter = bi->bi_iter;
-		}
-
-		src_bv = bio_iter_iovec(bi, src_iter);
-		bytes = src_bv.bv_len;
-
-		src_p = kmap_atomic(src_bv.bv_page);
-
-		err = create_hyp_mappings(src_p + src_bv.bv_offset,
-				src_p + src_bv.bv_offset + bytes);
-
-		kunmap_atomic(src_p);
-		if (err) {
-			tp_err("Failed to map a bio page");
-			return;
-		}
-
-		tp_info("sect [%d %d]%d rw=%d \n",
-				(int)src_iter.bi_sector,
-				src_iter.bi_size,bytes,rw);
-
-		tvm->protect.addr = (unsigned long) (src_p + src_bv.bv_offset);
-		tvm->protect.size = bytes;
-		if (rw == READ)
-			tp_call_hyp( matsov_decrypt ,tvm);
-		else
-			tp_call_hyp( matsov_encrypt ,tvm);
-		printk(tvm->print_buf);
-		bio_advance_iter(bi, &src_iter, bytes);
+	bio_for_each_segment_all(bvec, bio, i) {
+		unsigned int len = bvec->bv_len;
+		char *s = kmap_atomic(bvec->bv_page);
+		memset(s + bvec->bv_offset,'1', bvec->bv_len);
+		sector += len >> 9;
+		kunmap_atomic(s);
 	}
+
+	bio->bi_end_io  = tpbio->org_bio_endio;
+	bio->bi_private = tpbio->bi_private;	
+	mb();
+	kfree(tpbio);
+	bio_endio(bio);
 }
 
-blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bi)
+blk_qc_t truly_make_request_fn(struct request_queue *q,struct bio* bio)
 {
-	preempt_disable();
-	bio_map_data_to_hyp(this_cpu_ptr(&TVM), bi);
-	preempt_enable();
-	return org_make_request(q, bi);
+	int i = 0;
+	struct bio_vec *bvec;
+
+	sector_t sector = bio->bi_iter.bi_sector;
+
+	if (bio_data_dir(bio) == READ) {
+		struct truly_bio *tpbio = kmalloc(sizeof(struct truly_bio), GFP_NOIO); 	
+
+		tpbio->org_bio_endio = bio->bi_end_io;
+		tpbio->bi_private = bio->bi_private;
+
+		bio->bi_private = tpbio;
+		bio->bi_end_io = tp_bio_end_io;
+		printk("sec %zd org_bio_endio=%p\n",
+				sector,		
+				tpbio->org_bio_endio);
+		return org_make_request_fn(q, bio);
+	}
+
+// WRITE PATH
+	bio_for_each_segment_all(bvec, bio, i) {
+		unsigned int len = bvec->bv_len;
+
+		sector = bio->bi_iter.bi_sector;
+		memset(kmap(bvec->bv_page) + bvec->bv_offset,'1', bvec->bv_len);
+		printk("%d W sec %zd \n",i, sector);
+		sector += len >> 9;
+		kunmap(bvec->bv_page);
+	}
+	return org_make_request_fn(q, bio);
 }
 
 int truly_add_hook(struct gendisk *disk)
 {
-	struct request_queue *q;
-
-	if (strcmp(disk->disk_name,"sda"))
-		return -1;
-	q = disk->queue;
-	if (q == NULL){
-		tp_err("failed to find a queue");
+	struct request_queue *q = disk->queue;
+	if (strcmp(disk->disk_name,"sda")){
 		return -1;
 	}
 	tp_info("set hook disk %s\n",disk->disk_name);
-	org_make_request = q->make_request_fn;
+	org_make_request_fn = q->make_request_fn;
 	q->make_request_fn = truly_make_request_fn;
 	return 0;
 }
