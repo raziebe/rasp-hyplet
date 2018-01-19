@@ -69,8 +69,8 @@
 #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
 #define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-
-#define TP_HCR_GUEST_FLAGS 	(HCR_IMO| HCR_RW | HCR_VM)
+#define USER_TO_HYP(uva)	(uva)
+#define HYPLET_HCR_GUEST_FLAGS 	(HCR_RW | HCR_VM | HCR_IMO)
 
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
@@ -84,31 +84,59 @@ enum { ECB=0, CBC=1, CFB=2 };
 enum { DEFAULT_BLOCK_SIZE=16 };
 enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 
-struct matsov_protect {
+typedef enum { HYPLET_MAP_CODE = 1,
+	   HYPLET_MAP_STACK = 2,
+	   HYPLET_MAP_ANY= 3,
+	   HYPLET_TRAP_IRQ = 4,
+	   HYPLET_UNTRAP_IRQ = 5,
+}hyplet_ops;
+
+#define USER_CODE_MAPPED		UL(1) << 1
+#define USER_STACK_MAPPED		UL(1) << 2
+#define USER_MEM_ANON_MAPPED	UL(1) << 3
+#define RUN_HYPLET				UL(1) << 4
+
+struct hyplet_map_addr {
 	unsigned long addr;
 	int size;
 };
 
-struct truly_vm {
- 	struct matsov_protect protect;
+
+struct hyplet_ctrl {
+	int cmd  __attribute__ ((packed));
+	union  {
+		struct hyplet_map_addr addr;
+		int irq;
+	}__action  __attribute__ ((packed));
+};
+
+struct hyp_addr {
+	struct list_head lst;
+	unsigned long addr;
+	int size;
+};
+
+struct hyplet_vm {
+	unsigned long tpidr_el2;
+	unsigned long gic_irq;
+	unsigned long irq_to_trap;
+	unsigned long ttbr0_el1;
+	unsigned long hyplet_stack;
+	unsigned long hyplet_code;
+	void *task_struct;
 	unsigned long hcr_el2;
- 	unsigned int  hstr_el2;
+
+	unsigned int  hstr_el2;
  	unsigned long vttbr_el2;
  	unsigned int  vtcr_el2;
- 	unsigned long tpidr_el2;
  	unsigned long mdcr_el2;
  	unsigned long elr_el2;
  	unsigned long el2_sp;
  	unsigned long el1_sp;
  	unsigned long ich_hcr_el2;
- /*	unsigned long ich_vmcr_el2; control VM */
+ 	struct list_head hyp_addr_lst;
+ 	unsigned int state;
 
- /* 	unsigned long ich_eisr_el2;  end of interrupt status register */
-/* 	unsigned long ich_misr_el2; maintenance ISR */
-/* 	ICH_ELSR_EL2 */
-/*	ICH_HCR_EL2, xzr
-	x21, ICH_VTR_EL2
-*/
  	unsigned long regs[30];
  	unsigned long initialized; 	
  	unsigned long id_aa64mmfr0_el1;
@@ -116,38 +144,53 @@ struct truly_vm {
    	char print_buf[1024];
 } __attribute__ ((aligned (8)));
 
-static inline struct truly_vm *el2_get_tvm(void)
-{
-	struct truly_vm *tv;
+static inline struct hyplet_vm *hyplet_get_vm(void){
+	struct hyplet_vm *tv;
     asm("mrs %0,tpidr_el2\n":"=r"(tv));
 	return tv;
 }
 
-extern char __truly_vectors[];
-int truly_init(void);
-void truly_clone_vm(void *);
-void truly_smp_run_hyp(void);
-void tp_run_vm(void *);
-void truly_run_vm(void *);
-long tp_call_hyp(void *hyper_func, ...);
-void truly_exit_el1(void *hyp_func,...);
-void truly_enter_el1(void *hyp_func,...);
-unsigned long truly_get_tcr_el1(void);
-unsigned long truly_get_hcr_el2(void);
-unsigned long tp_get_ttbr0_el2(void);
-void truly_set_vectors(unsigned long vbar_el2);
-unsigned long truly_get_vectors(void);
+extern char __hyplet_vectors[];
+
+unsigned long get_el1_irq(void);
+struct hyplet_vm* hyplet_vm(void);
+int  hyplet_init(void);
+void hyplet_clone_vm(void *);
+void hyplet_smp_run_hyp(void);
+void hyplet_run_vm(void *);
+void hyplet_prepare_vm(void *);
+long hyplet_call_hyp(void *hyper_func, ...);
+void hyplet_exit_el1(void *hyp_func,...);
+void hyplet_enter_el1(void *hyp_func,...);
+unsigned long hyplet_get_tcr_el1(void);
+unsigned long hyplet_get_hcr_el2(void);
+unsigned long hyplet_get_ttbr0_el2(void);
+void hyplet_set_vectors(unsigned long vbar_el2);
+unsigned long hyplet_get_vectors(void);
 int create_hyp_mappings(void *, void *);
-void __hyp_text el2_sprintf(const char *fmt, ...);
-int __hyp_text el2_printk(const char *fmt, ...);
-long get_vgic_ver(void);
-void route_to_el2(void);
-void unroute_to_el2(void);
+unsigned long hyplet_create_pg_tbl(void *cxt);
+void make_vtcr_el2(struct hyplet_vm *tvm);
+unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);
+int hyplet_map_user_data(hyplet_ops ,  void *action);
+int hyplet_trap_irq(int irq);
+int hyplet_untrap_irq(int irq);
+int hyplet_start(void);
 
-#define tp_info(fmt, ...) \
-	pr_info("truly %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)
+#define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
+extern int __create_hyp_mappings(pgd_t *pgdp,
+				 unsigned long start, unsigned long end,
+				 unsigned long pfn, pgprot_t prot);
 
-#define tp_err(fmt, ...) \
-	pr_err("truly [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
+
+
+long hyplet_get_vgic_ver(void);
+void hyplet_enable_imo(void);
+void hyplet_imo(void);
+
+#define hyplet_info(fmt, ...) \
+		pr_info("hyplet %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)
+
+#define hyplet_err(fmt, ...) \
+		pr_err("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
 
 #endif

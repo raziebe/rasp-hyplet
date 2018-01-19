@@ -44,7 +44,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
 #include <asm/kvm_psci.h>
-#include <linux/truly.h>
+#include <linux/hyplet.h>
 
 
 #ifdef REQUIRES_VIRT
@@ -958,9 +958,9 @@ long kvm_arch_vm_ioctl(struct file *filp,
 
 static unsigned long get_hyp_vector(void)
 {
-#ifdef __TRULY__
-	tp_info("Assign truly vector %p\n",__truly_vectors);
-	return (unsigned long) __truly_vectors;
+#ifdef __HYPLET__
+	hyplet_info("Assign Hyplet vector\n");
+	return (unsigned long) __hyplet_vectors;
 #else
 	return (unsigned long)__kvm_hyp_vector;
 #endif
@@ -984,7 +984,9 @@ static void cpu_init_hyp_mode(void *dummy)
 
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 
-	tp_run_vm(NULL);
+#ifdef __HYPLET__
+	hyplet_prepare_vm(NULL);
+#endif
 }
 
 static int hyp_init_cpu_notify(struct notifier_block *self,
@@ -993,9 +995,9 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_STARTING:
 	case CPU_STARTING_FROZEN:
-		tp_info("%lx %lx" ,
-					(long) __hyp_get_vectors() ,
-					(long) hyp_default_vectors);
+		hyplet_info("%lx %lx" ,
+				(long) __hyp_get_vectors() ,
+				(long) hyp_default_vectors);
 
 		if (__hyp_get_vectors() == hyp_default_vectors)
 			cpu_init_hyp_mode(NULL);
@@ -1124,17 +1126,15 @@ static int init_hyp_mode(void)
 			goto out_free_context;
 		}
 	}
-#ifdef __TRULY__
-	truly_init();
+#ifdef __HYPLET__
+	hyplet_init();
+	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+	return 0;
 #endif
 	/*
 	 * Execute the init code on each CPU.
 	 */
 	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
-#ifdef __TRULY__	
-	return 0;
-#endif
-
 	/*
 	 * Init HYP view of VGIC
 	 */

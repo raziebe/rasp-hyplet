@@ -101,6 +101,9 @@
 #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
 #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
 
+#define ICH_EL2_TALL0		(UL(1) << 11)
+#define ICH_EL2_TALL1		(UL(1) << 12)
+
 /* ESR value templates for specific events */
 
 /* BRK instruction trap from AArch64 state */

@@ -38,7 +38,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 }
 
 void (*handle_arch_irq)(struct pt_regs *) = NULL;
-
+// raz
 void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
 {
 	if (handle_arch_irq)

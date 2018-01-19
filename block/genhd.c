@@ -631,10 +631,6 @@ void add_disk(struct gendisk *disk)
 
 	disk_add_events(disk);
 	blk_integrity_add(disk);
-	{
-		int truly_add_hook(struct gendisk *disk);
-		truly_add_hook(disk);
-	}
 }
 EXPORT_SYMBOL(add_disk);
 

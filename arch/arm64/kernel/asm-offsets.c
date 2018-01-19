@@ -29,7 +29,7 @@
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
 #include <linux/arm-smccc.h>
-#include <linux/truly.h>
+#include "../../../include/linux/hyplet.h"
 
 int main(void)
 {
@@ -167,15 +167,19 @@ int main(void)
   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
 
-  DEFINE(TP_HCR_EL2, offsetof(struct truly_vm,  hcr_el2));
-  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
-  DEFINE(TP_HSTR_EL2 , offsetof(struct truly_vm,  hstr_el2));
-  DEFINE(TP_VTTBR_EL2 , offsetof(struct truly_vm,  vttbr_el2));
-  DEFINE(TP_VTCR_EL2 , offsetof(struct truly_vm,  vtcr_el2));
-  DEFINE(TP_REGS ,  offsetof(struct truly_vm,  regs));
-  DEFINE(TP_EL2_SP, offsetof(struct truly_vm,  el2_sp));
-  DEFINE(TP_EL1_SP, offsetof(struct truly_vm,  el1_sp));
-//  DEFINE(TP_ICH_MISR_EL2, offsetof(struct truly_vm, ich_misr_el2));
-  DEFINE(TP_ICH_HCR_EL2, offsetof(struct truly_vm, ich_hcr_el2));
+  DEFINE(HYPLET_HCR_EL2, offsetof(struct hyplet_vm,  hcr_el2));
+  DEFINE(HYPLET_ELR_EL2, offsetof(struct hyplet_vm,  elr_el2));
+  DEFINE(HYPLET_HSTR_EL2 , offsetof(struct hyplet_vm,  hstr_el2));
+  DEFINE(HYPLET_VTTBR_EL2 , offsetof(struct hyplet_vm,  vttbr_el2));
+  DEFINE(HYPLET_VTCR_EL2 , offsetof(struct hyplet_vm,  vtcr_el2));
+  DEFINE(HYPLET_EL2_SP, offsetof(struct hyplet_vm,  el2_sp));
+  DEFINE(HYPLET_EL1_SP, offsetof(struct hyplet_vm,  el1_sp));
+  DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
+  DEFINE(HYPLET_TTBR0_EL1 , offsetof(struct hyplet_vm,  ttbr0_el1));
+  DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
+  DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  hyplet_code));
+  DEFINE(HYPLET_GIC_IRQ, offsetof(struct hyplet_vm, gic_irq));
+  DEFINE(HYPLET_ICH_HCR_EL2, offsetof(struct hyplet_vm, ich_hcr_el2));
+  DEFINE(HYPLET_REGS ,  offsetof(struct hyplet_vm,  regs));
   return 0;
 }

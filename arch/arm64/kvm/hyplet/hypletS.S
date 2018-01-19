@@ -22,54 +22,46 @@
 .align 7
 \label:
 	mov	x6, \num
-        b __truly_panic
+        b __hyplet_panic
 ENDPROC(\label)
 .endm
 
-.macro save_registers
-
-	mrs	 x0, 	 tpidr_el2
-	add  x0,x0,   #TP_REGS
-	stp	 x1,x2,  [x0]
-	stp  x2,x3,  [x0 , #16]
-	stp  x4,x5,  [x0 , #32]
-	stp  x6,x7,  [x0 , #48]
-	stp  x8,x9,  [x0 , #64]
-	stp  x10,x11,[x0 , #80]
-	stp x12,x13, [x0 , #96]
-	stp x14,x15, [x0 , #112]
-	stp x16,x17, [x0 , #128]
-	stp x18,x19, [x0 , #144]
-	stp x20,x21, [x0 , #160]
-	stp x22,x23, [x0 , #176]
-	stp x24,x25, [x0 , #192]
-	stp x26,x27, [x0 , #208]
-	stp x28,x29, [x0 , #224]
-	str	x30,     [x0,  #232]
+.macro push_registers
+	push x0,x1
+	push x2,x3
+	push x4,x5
+	push x6,x7
+	push x8,x9
+	push x10,x11
+	push x12,x13
+	push x14,x15
+	push x16,x17
+	push x18,x19
+	push x20,x21
+	push x22,x23
+	push x24,x25
+	push x26,x27
+	push x28,x29
+	push x30,xzr
 .endm
 
-
-.macro restore_registers
-	// restore stack pointer
-	mrs	 x0, 	 tpidr_el2
-	add  x0,x0,   #TP_REGS
-	ldp	 x1,x2,  [x0]
-	ldp  x2,x3,  [x0 , #16]
-	ldp  x4,x5,  [x0 , #32]
-	ldp  x6,x7,  [x0 , #48]
-	ldp  x8,x9,  [x0 , #64]
-	ldp  x10,x11,[x0 , #80]
-	ldp x12,x13, [x0 , #96]
-	ldp x14,x15, [x0 , #112]
-	ldp x16,x17, [x0 , #128]
-	ldp x18,x19, [x0 , #144]
-	ldp x20,x21, [x0 , #160]
-	ldp x22,x23, [x0 , #176]
-	ldp x24,x25, [x0 , #192]
-	ldp x26,x27, [x0 , #208]
-	ldp x28,x29, [x0 , #224]
-	ldr	x30,     [x0,  #232]
-
+.macro pop_registers
+	pop x30,xzr
+	pop x28,x29
+	pop x26,x27
+	pop x24,x25
+	pop x22,x23
+	pop x20,x21
+	pop x18,x19
+	pop x16,x17
+	pop x14,x15
+	pop x12,x13
+	pop x10,x11
+	pop x8,x9
+	pop x6,x7
+	pop x4,x5
+	pop x2,x3
+	pop x0,x1
 .endm
 
 EL1_sync:
@@ -80,10 +72,13 @@ EL1_sync:
 	lsr		x2, x1, #ESR_ELx_EC_SHIFT	// Syndrom register shift by 26 bits
 
 	cmp	x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
-	b.ne	3f
+	beq	2f
+	cmp x2,#ESR_ELx_EC_SYS64
+	b.eq do_msr
+	b 3f
 
 	/* Here, we're pretty sure the host called HVC */
-	pop		x2, x3
+2:	pop		x2, x3
 	pop		x0, x1
 
 	/* Check for __hyp_get_vectors */
@@ -106,14 +101,76 @@ EL1_sync:
 	eret
 
 3:
-	pop x0,x1
 	pop x2,x3
+	pop x0,x1
 
 2:	eret
 ENDPROC(EL1_sync)
 
+/* Check if this is a hyp controlleed interrupt
+  *    if not then just exit
 
-__truly_panic:
+*/
+do_msr:
+    mrs	 	x0,tpidr_el2
+    mrs_s  	x1, ICC_IAR1_EL1
+    isb
+	mov		 x2,xzr
+	ldr      x2,[x0, HYPLET_TRAP_IRQ]
+	cmp		 x2,x1
+	bne		 2f
+/*
+ *	User has set an hyplet
+ *  prepare to jump to hyplet
+*/
+	push_registers
+	mrs		x1,ttbr0_el1
+	mrs		x2,sp_el0
+	push    x1,x2
+
+	ldr		x1,[x0, HYPLET_TTBR0_EL1]
+	msr		ttbr0_el1, x1
+	ldr		x1,[x0, HYPLET_STACK]
+	msr		sp_el0,x1
+	ldr		x30,[x0, HYPLET_CODE]
+
+/*  EL2t. Switch stacks */
+    mrs  x1, spsel
+    and  w1,w1,#0xFFFFFFFE
+    msr  spsel,x1
+
+	blr x30 // Execute hyplet in EL2
+
+/*
+ * switch stacks back
+*/
+    mrs x1, spsel
+    orr w1,w1,#0x1
+    msr spsel,x1
+
+	pop     x1,x2
+	msr		ttbr0_el1,x1
+	msr		sp_el0,x2
+	pop_registers
+/*
+ * Disable access untill the next interrupt takes place
+*/
+2:
+    str    	x1,[x0, #HYPLET_GIC_IRQ]
+	mrs		x1,elr_el2
+	add		x1, x1, #4
+	msr		elr_el2,x1
+	msr_s	ICH_HCR_EL2,xzr
+
+1:
+	pop x2,x3
+	pop x0,x1
+
+	eret
+ENDPROC(do_msr)
+
+/* borrowed from kvm */
+__hyplet_panic:
 	adr	x0, __hyp_panic_str
 	adr	x1, 2f // adr generates a register-relative address in the destination register
 	ldp	x2, x3, [x1] // Load to Pair of Registers from two dwords starting from memory at [x1] 
@@ -136,94 +193,51 @@ __truly_panic:
 	.align	3
 2:	.quad	HYP_PAGE_OFFSET
 	.quad	PAGE_OFFSET
-ENDPROC(__truly_panic)
+ENDPROC(__hyplet_panic)
 __hyp_panic_str:
 	.ascii	"Truly panic:\nCode:%08x PC:%016x ESR:%08x\nFAR:%016x" \
 	" HPFAR:%016x RAZDBG:%p\nTrulyCxt:%p\n\0"
 
-ENTRY(truly_get_tcr_el1)
+ENTRY(hyplet_get_tcr_el1)
        mrs     x0, tcr_el1
        ret
-ENDPROC(truly_get_tcr_el1)
+ENDPROC(hyplet_get_tcr_el1)
 
 /*
 * This procedure calls the default hypervisor vector and
 * and sets truly vector. This is because when the cpu drops
 *  Linux calls smc and vbar_el2 resets.
 */
-ENTRY(truly_get_vectors)
+ENTRY(hyplet_get_vectors)
 	mov	x0,xzr
-ENTRY(truly_set_vectors)
+ENTRY(hyplet_set_vectors)
 	hvc #0
 	ret
-ENDPROC(truly_set_vectors)
-
-/* clobber list:x2
- * x0  - function pointer to call in EL1
- * x1:    opaque data to pass to EL1
-*/
-ENTRY(truly_enter_el1)
-
-	pop	lr, xzr // get the stashed lr
-
-	push x0,x1
-
-	save_registers				// user's stuff
-	mrs	 x0, tpidr_el2
-
-
-// save el1 stack pointer
-	mrs	x1, sp_el1
-	str	x1,[x0, #TP_EL1_SP] // store SP2 position
-
-// save user PC
-	mrs   x1, elr_el2
-	str   x1,[x0, #TP_ELR_EL2]
-
-// prepare to return
-	pop x0,x1
-	msr    elr_el2, x0	// set new el1 return address
-	mov    x0, x1			// prepare arguments
-
-	eret //	will return to the new function
-ENDPROC(truly_enter_el1)
+ENDPROC(hyplet_set_vectors)
 
 
 /*
  * Call into the vgic backend for state saving
  */
-ENTRY(get_vgic_ver)
+ENTRY(hyplet_get_vgic_ver)
 alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
         mov     x0,#2
 alternative_else
 		mov x0,#3
 alternative_endif
 	ret
-ENDPROC(get_vgic_ver)
-
-/*
- * user calls HVC at the end the function
-*/
-ENTRY(truly_exit_el1)
-	mrs	x0, tpidr_el2
-
-	ldr   	x1, [x0, #TP_EL1_SP]
-	msr	sp_el1,x1
-
-	ldr   	x1, [x0, #TP_ELR_EL2] // get user's last PC
-	msr 	elr_el2,x1
-
-	restore_registers
-	eret
-ENDPROC(truly_exit_el1)
+ENDPROC(hyplet_get_vgic_ver)
 
 
-ENTRY(tp_call_hyp)
+ENTRY(hyplet_call_hyp)
         hvc	#0
         ret
-ENDPROC(tp_call_hyp)
+ENDPROC(hyplet_call_hyp)
 
-ENTRY(route_to_el2)
+/*
+ * call right after EOI.
+*/
+ENTRY(hyplet_enable_imo)
 		mov		w1, #0x1
 		mov		x0, #1
 		lsl		w0, w0, #31
@@ -231,10 +245,10 @@ ENTRY(route_to_el2)
 		orr		x0, x0, #16
 		msr		hcr_el2, x0
   		ret
-ENDPROC(route_to_el2)
+ENDPROC(hyplet_enable_imo)
 
 
-ENTRY(truly_run_vm)
+ENTRY(hyplet_run_vm)
 
 	pop	lr, xzr
 
@@ -246,21 +260,17 @@ ENTRY(truly_run_vm)
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-	ldr		x1, [x0, #TP_HCR_EL2]
-	kern_hyp_va x1
+	ldr		x1, [x0, #HYPLET_HCR_EL2]
     msr     hcr_el2, x1
 
- 	ldr 	x1, [x0, #TP_HSTR_EL2]
-	kern_hyp_va x1
-    msr hstr_el2, x1
+ 	ldr 	x1, [x0, #HYPLET_HSTR_EL2]
+	msr 	hstr_el2, x1
 
-    ldr		x1, [x0, #TP_VTCR_EL2]
-	kern_hyp_va x1
-	msr	vtcr_el2, x1
+    ldr		x1, [x0, #HYPLET_VTCR_EL2]
+	msr		vtcr_el2, x1
 
-    ldr     x1, [x0, #TP_VTTBR_EL2]
-    kern_hyp_va x1
-    msr vttbr_el2, x1
+    ldr     x1, [x0, #HYPLET_VTTBR_EL2]
+    msr 	vttbr_el2, x1
 
 	mov	lr,x4
 
@@ -268,23 +278,37 @@ ENTRY(truly_run_vm)
 	pop x0,x1
 
 	eret
-ENDPROC(truly_run_vm)
+ENDPROC(hyplet_run_vm)
 
+/*
+ * All interrupts walks through this section
+  * Turn on msr trap.. Turn off IMO
+  and leave
+  *
+*/
 EL1_64_irq:
-	push 	x0,x1
-	mov		w1, #0x1
-	mov		x0, #1
-	lsl		x0, x0, #31
-	orr		x0, x0, x1
-	msr		hcr_el2, x0
-	pop		x0,x1
-	eret
+		push x0,x1
+/*
+* 	I rely that the next msr  on this processor would be
+*	to read the interrypt
+*/
+		mov     x0,#(ICH_EL2_TALL1)
+		msr_s	ICH_HCR_EL2,x0
+/*
+ * disable hcr IMO
+*/
+       	mov     w1, #0x1
+       	mov     x0, #1
+       	lsl     x0, x0, #31
+       	orr     x0, x0, x1
+       	msr     hcr_el2, x0
+
+	   	pop x0,x1
+       	eret
 ENDPROC(EL1_64_irq)
 
-
-// http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CHDEEDDC.html
 .align 11
-ENTRY(__truly_vectors)
+ENTRY(__hyplet_vectors)
         invalid_vector	EL2_sync,#1                        //Current EL with SP0
         invalid_vector  EL2_irq_invalid,#2                 // IRQ EL2t
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
@@ -304,6 +328,6 @@ ENTRY(__truly_vectors)
         invalid_vector  EL1_irq_invalid, #11                 		// IRQ 32-bit EL1
         invalid_vector  EL1_fiq_invalidLowEL32 ,#12               // FIQ 32-bit EL1
         invalid_vector  EL1_error_invalidLowEL32,#13               // Error 32-bit EL1
-ENDPROC(__truly_vectors)
+ENDPROC(__hyplet_vectors)
 
 .popsection

@@ -188,7 +188,7 @@ tsk	.req	x28		// current thread_info
 	mov	x0, sp
 	blr	x1
 // test if hyp vector is set and if so then turn it back on
-	bl  tp_trigger_el2
+//	bl  tp_trigger_el2
 	.endm
 
 	.text
@@ -280,11 +280,16 @@ el1_error_invalid:
 	inv_entry 1, BAD_ERROR
 ENDPROC(el1_error_invalid)
 
+ENTRY(get_el0_irq)
+	mov x0, el0_irq
+	ret
+ENDPROC(get_el0_irq);
+
 /*
  * EL1 mode handlers.
  */
 	.align	6
-el1_sync:
+ENTRY(el1_sync)
 	kernel_entry 1
 	mrs	x1, esr_el1			// read the syndrome register
 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
@@ -353,7 +358,7 @@ el1_inv:
 ENDPROC(el1_sync)
 
 	.align	6
-el1_irq:
+ENTRY(el1_irq)
 	kernel_entry 1
 	enable_dbg
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -373,8 +378,10 @@ el1_irq:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
 #endif
+	bl hyplet_imo
 	kernel_exit 1
 ENDPROC(el1_irq)
+
 
 #ifdef CONFIG_PREEMPT
 el1_preempt:
@@ -555,7 +562,7 @@ el0_inv:
 ENDPROC(el0_sync)
 
 	.align	6
-el0_irq:
+ENTRY(el0_irq)
 	kernel_entry 0
 el0_irq_naked:
 	enable_dbg
