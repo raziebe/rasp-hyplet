@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-int some_global = 0x111;
+int some_global = 0;
 
 enum { HYPLET_MAP_CODE = 1,
 	   HYPLET_MAP_STACK = 2,
@@ -129,7 +129,14 @@ int   main(int argc, char *argv[])
 		return -1;
 	}
 
-
-	pause();
+	sleep(2);
+	hplt.__action.irq = irq;
+	rc = hyplet_ctl( HYPLET_UNTRAP_IRQ , &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed assign irq\n");
+		return -1;
+	}
+	sleep(2);
+	printf("some global %d\n",some_global);
 }
 

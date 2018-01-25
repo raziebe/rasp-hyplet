@@ -534,6 +534,12 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
+void hyp_user_unmap(unsigned long umem,int size)
+{
+        int sz_page = PAGE_ALIGN(size);
+        unmap_range(NULL, hyp_pgd, umem, sz_page);
+ }
+
 int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot)

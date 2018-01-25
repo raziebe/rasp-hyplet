@@ -339,8 +339,24 @@ int hyplet_untrap_irq(int irq)
 				desc->irq_data.hwirq);
 		return -EINVAL;
 	}
+	hyplet_reset(current);
+	return 0;
+}
+
+
+
+void hyplet_reset(struct task_struct *tsk)
+{
+	struct hyplet_vm *tv = this_cpu_ptr(&TVM);
+
+	if (tv->task_struct != tsk)
+		return;
 
 	tv->irq_to_trap = 0;
 	mb();
-	return 0;
+	hyplet_free_mem();
+	tv->state  = 0;
+	tv->ttbr0_el1 = 0;
+	tv->task_struct = NULL;
+	hyplet_info("reset pid=%d\n",tsk->pid);
 }

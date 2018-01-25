@@ -117,12 +117,13 @@ struct hyp_addr {
 };
 
 struct hyplet_vm {
-	unsigned long tpidr_el2;
+
 	unsigned long gic_irq;
 	unsigned long irq_to_trap;
-	unsigned long ttbr0_el1;
 	unsigned long hyplet_stack;
 	unsigned long hyplet_code;
+	unsigned long ttbr0_el1;
+
 	void *task_struct;
 	unsigned long hcr_el2;
 
@@ -137,7 +138,6 @@ struct hyplet_vm {
  	struct list_head hyp_addr_lst;
  	unsigned int state;
 
- 	unsigned long regs[30];
  	unsigned long initialized; 	
  	unsigned long id_aa64mmfr0_el1;
    	void* pg_lvl_one;
@@ -175,6 +175,11 @@ int hyplet_map_user_data(hyplet_ops ,  void *action);
 int hyplet_trap_irq(int irq);
 int hyplet_untrap_irq(int irq);
 int hyplet_start(void);
+void hyplet_reset(struct task_struct *tsk);
+void hyplet_invld_tlb(unsigned long);
+void hyplet_free_mem(void);
+void hyplet_reset(struct task_struct *tsk);
+void hyp_user_unmap(unsigned long umem,int size);
 
 #define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
 extern int __create_hyp_mappings(pgd_t *pgdp,

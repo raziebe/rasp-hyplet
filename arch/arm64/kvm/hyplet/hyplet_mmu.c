@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/hyplet.h>
 
+
 extern pgd_t *hyp_pgd;
 
 
@@ -350,4 +351,17 @@ int hyplet_map_user_data(hyplet_ops type, void *action)
 	return -1;
 }
 
+void hyplet_free_mem(void)
+{
+        struct hyplet_vm *tv = hyplet_vm();
+        struct hyp_addr* tmp,*tmp2;
+
+        list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
+        		hyp_user_unmap( tmp->addr , tmp->size);
+                hyplet_call_hyp(hyplet_invld_tlb, tmp->addr);
+                list_del(&tmp->lst);
+                hyplet_info("unmap %lx\n",tmp->addr);
+                kfree(tmp);
+        }
+}
 
