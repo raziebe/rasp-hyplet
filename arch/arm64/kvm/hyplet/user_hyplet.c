@@ -130,13 +130,6 @@ int   main(int argc, char *argv[])
 	}
 
 	sleep(2);
-	hplt.__action.irq = irq;
-	rc = hyplet_ctl( HYPLET_UNTRAP_IRQ , &hplt);
-	if (rc < 0){
-		printf("hyplet: Failed assign irq\n");
-		return -1;
-	}
-	sleep(2);
 	printf("some global %d\n",some_global);
 }
 
