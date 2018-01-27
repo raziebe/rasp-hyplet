@@ -130,7 +130,7 @@ int hyplet_init(void)
 	INIT_LIST_HEAD(&  _tvm->hyp_addr_lst );
 
 	/* B4-1583 */
-	_tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
+//	_tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
 	_tvm->mdcr_el2 = 0x00;
 	_tvm->ich_hcr_el2 = 0;
 
@@ -292,11 +292,6 @@ int hyplet_ctl(unsigned long arg)
 				return hyplet_untrap_irq(hplt.__action.irq);
 	}
 	return rc;
-}
-
-asmlinkage long sys_hyplet(long d)
-{
-	return hyplet_ctl (d);
 }
 
 int hyplet_trap_irq(int irq)

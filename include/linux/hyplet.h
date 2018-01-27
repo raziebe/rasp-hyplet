@@ -180,6 +180,7 @@ void hyplet_invld_tlb(unsigned long);
 void hyplet_free_mem(void);
 void hyplet_reset(struct task_struct *tsk);
 void hyp_user_unmap(unsigned long umem,int size);
+int hyplet_ctl(unsigned long arg);
 
 #define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
 extern int __create_hyp_mappings(pgd_t *pgdp,

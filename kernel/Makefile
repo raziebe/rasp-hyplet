@@ -21,6 +21,7 @@ endif
 
 ifeq ($(CONFIG_HYPLET), y)
 CFLAGS_exit.o +=  -D__HYPLET__
+CFLAGS_sys.o += -D__HYPLET__
 endif
 
 # cond_syscall is currently not LTO compatible
