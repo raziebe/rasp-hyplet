@@ -109,12 +109,7 @@ int hyplet_init(void)
 	long id_aa64mmfr0_el1;
 	struct hyplet_vm *_tvm;
 	int cpu = 0;
-/*
-	if  ( hyplet_get_vgic_ver() == 2){
-		hyplet_info("Hyplet ARM are applicable only with GiCv3");
-		return -1;
-	}
-*/
+
 	id_aa64mmfr0_el1 = hyplet_get_mfr();
 	tcr_el1 = hyplet_get_tcr_el1();
 
