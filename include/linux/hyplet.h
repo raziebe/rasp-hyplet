@@ -164,7 +164,8 @@ void hyplet_exit_el1(void *hyp_func,...);
 void hyplet_enter_el1(void *hyp_func,...);
 unsigned long hyplet_get_tcr_el1(void);
 unsigned long hyplet_get_hcr_el2(void);
-unsigned long hyplet_get_ttbr0_el2(void);
+
+unsigned long hyplet_get_ttbr0_el1(void);
 void hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long hyplet_get_vectors(void);
 int create_hyp_mappings(void *, void *);
