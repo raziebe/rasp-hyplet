@@ -20,7 +20,7 @@
 DEFINE_PER_CPU(struct hyplet_vm, TVM);
 static struct proc_dir_entry *procfs = NULL;
 
-struct hyplet_vm* hyplet_vm(void)
+struct hyplet_vm* hyplet_get_vm(void)
 {
 	return this_cpu_ptr(&TVM);
 }
@@ -39,6 +39,15 @@ unsigned long hyplet_get_ttbr0_el1(void)
       return ttbr0_el1;
 }
 
+void make_hcr_el2(struct hyplet_vm *tvm)
+{
+	tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
+}
+
+void make_mdcr_el2(struct hyplet_vm *tvm)
+{
+	tvm->mdcr_el2 = 0x00;
+}
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
@@ -100,12 +109,12 @@ int hyplet_init(void)
 	long id_aa64mmfr0_el1;
 	struct hyplet_vm *_tvm;
 	int cpu = 0;
-
+/*
 	if  ( hyplet_get_vgic_ver() == 2){
 		hyplet_info("Hyplet ARM are applicable only with GiCv3");
 		return -1;
 	}
-
+*/
 	id_aa64mmfr0_el1 = hyplet_get_mfr();
 	tcr_el1 = hyplet_get_tcr_el1();
 
@@ -114,24 +123,19 @@ int hyplet_init(void)
 	ips = (tcr_el1 >> 32) & 0b111;
 	pa_range = id_aa64mmfr0_el1 & 0b1111;
 
-	_tvm = this_cpu_ptr(&TVM);
+	_tvm = hyplet_get_vm();
 	memset(_tvm, 0x00, sizeof(*_tvm));
-    	hyplet_create_pg_tbl(_tvm);
+	hyplet_create_pg_tbl(_tvm);
 	make_vtcr_el2(_tvm);
-	_tvm->hstr_el2 = 0;
-
-	INIT_LIST_HEAD(&  _tvm->hyp_addr_lst );
-
-	/* B4-1583 */
-	_tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
-	_tvm->mdcr_el2 = 0x00;
-	_tvm->ich_hcr_el2 = 0;
+	make_hcr_el2(_tvm);
+	make_mdcr_el2(_tvm);
 
 	for_each_possible_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
 		if (tv != _tvm) {
 			memcpy(tv, _tvm, sizeof(*_tvm));
 		}
+		INIT_LIST_HEAD(&tv->hyp_addr_lst);
 	}
 	hyplet_info("sizeof hyplet %zd\n",sizeof(struct hyplet_ctrl));
 	init_procfs();

@@ -274,7 +274,7 @@ int __hyplet_map_user_data(void *umem,int size)
 
 	aligned_addr = (unsigned long)umem & PAGE_MASK;
 	end_addr = (unsigned long)umem + size;
-	tv = hyplet_vm();
+	tv = hyplet_get_vm();
 
 	err = create_hyp_user_mappings(umem, umem + size);
 	if (err){
@@ -307,7 +307,7 @@ int hyplet_map_user_data(hyplet_ops type, void *action)
 	unsigned long umem;
 
 
-	tv = hyplet_vm();
+	tv = hyplet_get_vm();
 
 	size = uaddr->size;
 	umem = (unsigned long)uaddr->addr & PAGE_MASK;
@@ -353,7 +353,7 @@ int hyplet_map_user_data(hyplet_ops type, void *action)
 
 void hyplet_free_mem(void)
 {
-        struct hyplet_vm *tv = hyplet_vm();
+        struct hyplet_vm *tv = hyplet_get_vm();
         struct hyp_addr* tmp,*tmp2;
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
