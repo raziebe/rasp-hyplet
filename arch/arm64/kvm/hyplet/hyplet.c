@@ -73,7 +73,9 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 
 	for_each_possible_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
-		len += sprintf(page + len, "cpu %d initialized %ld\n", cpu,
+		len += sprintf(page + len, "cpu %d initialized %ld irq=%ld\n", 
+				   cpu,
+				   tv->initialized,
 			       	   tv->gic_irq);
 	}
 
