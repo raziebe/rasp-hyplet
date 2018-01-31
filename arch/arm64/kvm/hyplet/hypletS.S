@@ -112,45 +112,45 @@ ENDPROC(EL1_sync)
 
 */
 do_msr:
-    mrs	 	x0, tpidr_el2
-    mrs_s  	x1, ICC_IAR1_EL1
-    isb
-	mov		 x2, xzr
+    	mrs	x0, tpidr_el2
+    	mrs_s  	x1, ICC_IAR1_EL1
+    	isb
+	mov	 x2, xzr
 	ldr      x2,[x0, HYPLET_TRAP_IRQ]
-	cmp		 x2, x1
-	bne		 2f
+	cmp	 x2, x1
+	bne	 2f
 /*
  *	User has set an hyplet
  *  prepare to jump to hyplet
 */
 	push_registers
-	mrs		x1, ttbr0_el1
-	mrs		x2, sp_el0
+	mrs	x1, ttbr0_el1
+	mrs	x2, sp_el0
 	push    x1, x2
 
-	ldr		x1,[x0, HYPLET_TTBR0_EL1]
-	msr		ttbr0_el1, x1
-	ldr		x1,[x0, HYPLET_STACK]
-	msr		sp_el0,x1
-	ldr		x30,[x0, HYPLET_CODE]
+	ldr	x1,[x0, HYPLET_TTBR0_EL1]
+	msr	ttbr0_el1, x1
+	ldr	x1,[x0, HYPLET_STACK]
+	msr	sp_el0,x1
+	ldr	x30,[x0, HYPLET_CODE]
 
 /*  EL2t. Switch stacks */
-    mrs  x1, spsel
-    and  w1,w1,#0xFFFFFFFE
-    msr  spsel,x1
+    	mrs  x1, spsel
+    	and  w1,w1,#0xFFFFFFFE
+    	msr  spsel,x1
 
 	blr x30 // Execute hyplet in EL2
 
 /*
  * switch stacks back
 */
-    mrs x1, spsel
-    orr w1, w1, #0x1
-    msr spsel,x1
+    	mrs x1, spsel
+    	orr w1, w1, #0x1
+    	msr spsel,x1
 
 	pop     x1,x2
-	msr		ttbr0_el1,x1
-	msr		sp_el0, x2
+	msr	ttbr0_el1,x1
+	msr	sp_el0, x2
 	pop_registers
 
 /*
@@ -158,12 +158,15 @@ do_msr:
  * interrupt will take place
 */
 2:
-    str    	x1,[x0, #HYPLET_GIC_IRQ]
-	mrs		x1, elr_el2
-	add		x1, x1, #4
-	msr		elr_el2,x1
+    	str    	x1,[x0, #HYPLET_GIC_IRQ]
+	mrs	x1, elr_el2
+	add	x1, x1, #4
+	msr	elr_el2,x1
 	msr_s	ICH_HCR_EL2,xzr
-
+/* debug counter */
+	ldr	x1,[x0, #HYPLET_CNT]
+	add	x1,x1,  #1
+	str	x1,[x0, #HYPLET_CNT]
 1:
 	pop x2,x3
 	pop x0,x1
@@ -295,13 +298,13 @@ ENDPROC(hyplet_run_vm)
   *
 */
 EL1_64_irq:
-		push x0,x1
+	push x0,x1
 /*
 * 	I rely that the next msr  on this processor would be
 *	to read the interrypt
 */
-		mov     x0,#(ICH_EL2_TALL1)
-		msr_s	ICH_HCR_EL2,x0
+//	mov     x0,#(ICH_EL2_TALL1)
+//	msr_s	ICH_HCR_EL2,x0
 /*
  * disable hcr IMO
 */
@@ -311,7 +314,7 @@ EL1_64_irq:
        	orr     x0, x0, x1
        	msr     hcr_el2, x0
 
-	   	pop x0,x1
+   	pop x0,x1
        	eret
 ENDPROC(EL1_64_irq)
 

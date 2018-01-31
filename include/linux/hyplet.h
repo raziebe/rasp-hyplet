@@ -70,7 +70,7 @@
 #define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 #define USER_TO_HYP(uva)	(uva)
-#define HYPLET_HCR_GUEST_FLAGS 	(HCR_RW | HCR_VM)
+#define HYPLET_HCR_GUEST_FLAGS 	(HCR_RW | HCR_VM | HCR_IMO)
 
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
@@ -117,7 +117,7 @@ struct hyp_addr {
 };
 
 struct hyplet_vm {
-
+	unsigned long int_cnt;
 	unsigned long gic_irq;
 	unsigned long irq_to_trap;
 	unsigned long hyplet_stack;

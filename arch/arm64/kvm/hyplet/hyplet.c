@@ -71,10 +71,11 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 	if (filp->private_data == 0x00)
 		return 0;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
-		len += sprintf(page + len, "cpu %d initialized %ld irq=%ld\n", 
+		len += sprintf(page + len, "cpu%d cnt=%ld init %ld irq=%ld\n", 
 				   cpu,
+				   tv->int_cnt,
 				   tv->initialized,
 			       	   tv->gic_irq);
 	}
