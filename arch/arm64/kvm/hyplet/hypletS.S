@@ -304,8 +304,8 @@ EL1_64_irq:
 * 	I rely that the next msr  on this processor would be
 *	to read the interrypt
 */
-//	mov     x0,#(ICH_EL2_TALL1)
-//	msr_s	ICH_HCR_EL2,x0
+	mov     x0,#(ICH_EL2_TALL1)
+	msr_s	ICH_HCR_EL2,x0
 /*
  /* disable hcr IMO */
 
