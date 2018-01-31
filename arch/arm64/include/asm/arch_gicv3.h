@@ -100,8 +100,8 @@ static inline void gic_write_dir(u32 irq)
 
 static inline u64 gic_read_iar_common(void)
 {
-	u64 irqstat;
 	int is_hyplet_on(void);
+	u64 irqstat;
 
 	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
 	if (is_hyplet_on()){

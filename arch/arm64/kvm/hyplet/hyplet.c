@@ -14,20 +14,13 @@
 #include <linux/vmalloc.h>
 #include <asm/fixmap.h>
 #include <asm/memory.h>
-
-#include <asm/page.h>
-#include <linux/irqchip.h>
-#include <linux/irqchip/arm-gic-common.h>
-#include <linux/irqchip/arm-gic-v3.h>
-#include <asm/arch_gicv3.h>
 #include <linux/hyplet.h>
-#include <linux/irq.h>
-#include <linux/irqdesc.h>
+
 
 DEFINE_PER_CPU(struct hyplet_vm, TVM);
 static struct proc_dir_entry *procfs = NULL;
 
-struct hyplet_vm* hyplet_vm(void)
+struct hyplet_vm* hyplet_get_vm(void)
 {
 	return this_cpu_ptr(&TVM);
 }
@@ -46,6 +39,15 @@ unsigned long hyplet_get_ttbr0_el1(void)
       return ttbr0_el1;
 }
 
+void make_hcr_el2(struct hyplet_vm *tvm)
+{
+	tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
+}
+
+void make_mdcr_el2(struct hyplet_vm *tvm)
+{
+	tvm->mdcr_el2 = 0x00;
+}
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
@@ -69,9 +71,12 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 	if (filp->private_data == 0x00)
 		return 0;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
-		len += sprintf(page + len, "cpu %d initialized %ld\n", cpu,
+		len += sprintf(page + len, "cpu%d cnt=%ld init %ld irq=%ld\n", 
+				   cpu,
+				   tv->int_cnt,
+				   tv->initialized,
 			       	   tv->gic_irq);
 	}
 
@@ -108,11 +113,6 @@ int hyplet_init(void)
 	struct hyplet_vm *_tvm;
 	int cpu = 0;
 
-	if  ( hyplet_get_vgic_ver() == 2){
-		hyplet_info("Hyplet ARM are applicable only with GiCv3");
-		return -1;
-	}
-
 	id_aa64mmfr0_el1 = hyplet_get_mfr();
 	tcr_el1 = hyplet_get_tcr_el1();
 
@@ -121,24 +121,19 @@ int hyplet_init(void)
 	ips = (tcr_el1 >> 32) & 0b111;
 	pa_range = id_aa64mmfr0_el1 & 0b1111;
 
-	_tvm = this_cpu_ptr(&TVM);
+	_tvm = hyplet_get_vm();
 	memset(_tvm, 0x00, sizeof(*_tvm));
-    	hyplet_create_pg_tbl(_tvm);
+	hyplet_create_pg_tbl(_tvm);
 	make_vtcr_el2(_tvm);
-	_tvm->hstr_el2 = 0;
-
-	INIT_LIST_HEAD(&  _tvm->hyp_addr_lst );
-
-	/* B4-1583 */
-	_tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
-	_tvm->mdcr_el2 = 0x00;
-	_tvm->ich_hcr_el2 = 0;
+	make_hcr_el2(_tvm);
+	make_mdcr_el2(_tvm);
 
 	for_each_possible_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
 		if (tv != _tvm) {
 			memcpy(tv, _tvm, sizeof(*_tvm));
 		}
+		INIT_LIST_HEAD(&tv->hyp_addr_lst);
 	}
 	hyplet_info("sizeof hyplet %zd\n",sizeof(struct hyplet_ctrl));
 	init_procfs();
@@ -223,140 +218,3 @@ int is_hyplet_on(void)
 	return (tvm->gic_irq != 0);
 }
 
-u64 hyp_gic_read_iar(void)
-{
-	struct hyplet_vm *tvm = this_cpu_ptr(&TVM);
-	unsigned long long gic_irq = tvm->gic_irq;
-
-	tvm->gic_irq = 0;
-	return gic_irq;
-}
-
-// call after gic_handle_irq
-void hyplet_imo(void)
-{
-	struct hyplet_vm *tvm = this_cpu_ptr(&TVM);
-	if (tvm->initialized){
-		hyplet_call_hyp(hyplet_enable_imo, NULL, NULL);
-	}
-}
-
-
-/*
-  * 1. A user maps a stack and execution code
-  *      of a an available thread.
-  * 2. hyplet_ctl responsibilities
-  *   Map function
-  *   Map stack
-  *   hyplet start
-  *   	Set the trapped irq
-  *   	Cache hyp_uthread task_struct
-  *   	Cache ttbr0_el1
-  *
-  * Please see hyplet_user.c for example
-*/
-int hyplet_ctl(unsigned long arg)
-{
-	struct hyplet_vm *hypletvm = this_cpu_ptr(&TVM);
-	struct hyplet_ctrl hplt;
-	int rc = -1;
-
-	if ( copy_from_user(&hplt, (void *) arg, sizeof(hplt)) ){
-		hyplet_err(" failed to copy from user");
-		return -1;
-	}
-
-	switch (hplt.cmd)
-	{
-		case HYPLET_MAP_ANY:
-				return hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-
-		case HYPLET_MAP_STACK:
-				rc = hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-				if ( rc )
-						return -EINVAL;
-				hypletvm->hyplet_stack = (long)(hplt.__action.addr.addr) + hplt.__action.addr.size - PAGE_SIZE;
-				break;
-
-		case HYPLET_MAP_CODE:
-				rc = hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-				if ( rc )
-					return -EINVAL;
-				hypletvm->hyplet_code = hplt.__action.addr.addr;
-				break;
-		case HYPLET_TRAP_IRQ:
-				// user provides the irq, we must find hw_irq
-				return hyplet_trap_irq(hplt.__action.irq);
-
-		case HYPLET_UNTRAP_IRQ:
-				return hyplet_untrap_irq(hplt.__action.irq);
-	}
-	return rc;
-}
-
-asmlinkage long sys_hyplet(long d)
-{
-	return hyplet_ctl (d);
-}
-
-int hyplet_trap_irq(int irq)
-{
-	struct irq_desc *desc;
-	struct hyplet_vm *tv = this_cpu_ptr(&TVM);
-
-	desc  = irq_to_desc(irq);
-	if (!desc) {
-		hyplet_err("Incorrect irq %d\n",irq);
-		return -EINVAL;
-	}
-	// save context
-	tv->ttbr0_el1 = hyplet_get_ttbr0_el1();
-	tv->task_struct = current;
-	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
-		return -EINVAL;
-	}
-	tv->state |= RUN_HYPLET;
-	tv->irq_to_trap = desc->irq_data.hwirq;
-	mb();
-	return 0;
-}
-
-int hyplet_untrap_irq(int irq)
-{
-	struct irq_desc *desc;
-	struct hyplet_vm *tv = this_cpu_ptr(&TVM);
-
-	desc  = irq_to_desc(irq);
-	if (!desc) {
-		hyplet_err("Incorrect irq %d\n",irq);
-		return -EINVAL;
-	}
-
-	if (desc->irq_data.hwirq != tv->irq_to_trap){
-		hyplet_err("Incorrect hwirq %ld because"
-					" local irq is %ld\n"
-				,tv->irq_to_trap,
-				desc->irq_data.hwirq);
-		return -EINVAL;
-	}
-	hyplet_reset(current);
-	return 0;
-}
-
-
-
-void hyplet_reset(struct task_struct *tsk)
-{
-	struct hyplet_vm *tv = this_cpu_ptr(&TVM);
-
-	if (tv->task_struct != tsk)
-		return;
-
-	tv->irq_to_trap = 0;
-	mb();
-	hyplet_free_mem();
-	tv->state  = 0;
-	tv->ttbr0_el1 = 0;
-	tv->task_struct = NULL;
-	hyplet_info("reset pid=%d\n",tsk->pid);
-}

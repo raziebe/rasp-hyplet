@@ -112,45 +112,45 @@ ENDPROC(EL1_sync)
 
 */
 do_msr:
-    mrs	 	x0, tpidr_el2
-    mrs_s  	x1, ICC_IAR1_EL1
-    isb
-	mov		 x2, xzr
+    	mrs	x0, tpidr_el2
+    	mrs_s  	x1, ICC_IAR1_EL1
+    	isb
+	mov	 x2, xzr
 	ldr      x2,[x0, HYPLET_TRAP_IRQ]
-	cmp		 x2, x1
-	bne		 2f
+	cmp	 x2, x1
+	bne	 2f
 /*
  *	User has set an hyplet
  *  prepare to jump to hyplet
 */
 	push_registers
-	mrs		x1, ttbr0_el1
-	mrs		x2, sp_el0
+	mrs	x1, ttbr0_el1
+	mrs	x2, sp_el0
 	push    x1, x2
 
-	ldr		x1,[x0, HYPLET_TTBR0_EL1]
-	msr		ttbr0_el1, x1
-	ldr		x1,[x0, HYPLET_STACK]
-	msr		sp_el0,x1
-	ldr		x30,[x0, HYPLET_CODE]
+	ldr	x1,[x0, HYPLET_TTBR0_EL1]
+	msr	ttbr0_el1, x1
+	ldr	x1,[x0, HYPLET_STACK]
+	msr	sp_el0,x1
+	ldr	x30,[x0, HYPLET_CODE]
 
 /*  EL2t. Switch stacks */
-    mrs  x1, spsel
-    and  w1,w1,#0xFFFFFFFE
-    msr  spsel,x1
+    	mrs  x1, spsel
+    	and  w1,w1,#0xFFFFFFFE
+    	msr  spsel,x1
 
 	blr x30 // Execute hyplet in EL2
 
 /*
  * switch stacks back
 */
-    mrs x1, spsel
-    orr w1, w1, #0x1
-    msr spsel,x1
+    	mrs x1, spsel
+    	orr w1, w1, #0x1
+    	msr spsel,x1
 
 	pop     x1,x2
-	msr		ttbr0_el1,x1
-	msr		sp_el0, x2
+	msr	ttbr0_el1,x1
+	msr	sp_el0, x2
 	pop_registers
 
 /*
@@ -158,12 +158,11 @@ do_msr:
  * interrupt will take place
 */
 2:
-    str    	x1,[x0, #HYPLET_GIC_IRQ]
-	mrs		x1, elr_el2
-	add		x1, x1, #4
-	msr		elr_el2,x1
+    	str    	x1,[x0, #HYPLET_GIC_IRQ]
+	mrs	x1, elr_el2
+	add	x1, x1, #4
+	msr	elr_el2,x1
 	msr_s	ICH_HCR_EL2,xzr
-
 1:
 	pop x2,x3
 	pop x0,x1
@@ -229,9 +228,9 @@ ENDPROC(hyplet_set_vectors)
  */
 ENTRY(hyplet_get_vgic_ver)
 alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-        mov     x0,#2
+        mov  x0,#2
 alternative_else
-		mov x0,#3
+	mov x0, #3
 alternative_endif
 	ret
 ENDPROC(hyplet_get_vgic_ver)
@@ -246,13 +245,13 @@ ENDPROC(hyplet_call_hyp)
  * call right after EOI.
 */
 ENTRY(hyplet_enable_imo)
-		mov		w1, #0x1
-		mov		x0, #1
-		lsl		w0, w0, #31
-		orr		x0, x0, x1
-		orr		x0, x0, #16
-		msr		hcr_el2, x0
-  		ret
+	mov		w1, #0x1
+	mov		x0, #1
+	lsl		w0, w0, #31
+	orr		x0, x0, x1
+	orr		x0, x0, #16
+	msr		hcr_el2, x0
+  	ret
 ENDPROC(hyplet_enable_imo)
 
 
@@ -260,30 +259,30 @@ ENTRY(hyplet_run_vm)
 
 	pop	lr, xzr
 
-	push x0,x1
-	push x3,x4
+	push 	x0,x1
+	push 	x2,x3
 
-	mov	x4, lr		// save the link register of EL1 before losing it.
+	mov	x3, lr		// save the link register of EL1 before losing it.
 
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-	ldr		x1, [x0, #HYPLET_HCR_EL2]
-    msr     hcr_el2, x1
+	ldr	x1, [x0, #HYPLET_HCR_EL2]
+   	 msr     hcr_el2, x1
 
  	ldr 	x1, [x0, #HYPLET_HSTR_EL2]
 	msr 	hstr_el2, x1
 
-    ldr		x1, [x0, #HYPLET_VTCR_EL2]
-	msr		vtcr_el2, x1
+    	ldr	x1, [x0, #HYPLET_VTCR_EL2]
+	msr	vtcr_el2, x1
 
-    ldr     x1, [x0, #HYPLET_VTTBR_EL2]
-    msr 	vttbr_el2, x1
+    	ldr     x1, [x0, #HYPLET_VTTBR_EL2]
+    	msr 	vttbr_el2, x1
 
-	mov	lr,x4
+	mov	lr,x3
 
-	pop x3,x4
-	pop x0,x1
+	pop 	x2,x3
+	pop 	x0,x1
 
 	eret
 ENDPROC(hyplet_run_vm)
@@ -295,23 +294,28 @@ ENDPROC(hyplet_run_vm)
   *
 */
 EL1_64_irq:
-		push x0,x1
+	push x0,x1
+/* debug counter */
+    	mrs	x0, tpidr_el2
+	ldr	x1,[x0, #HYPLET_CNT]
+	add	x1,x1,  #1
+	str	x1,[x0, #HYPLET_CNT]
 /*
 * 	I rely that the next msr  on this processor would be
 *	to read the interrypt
 */
-		mov     x0,#(ICH_EL2_TALL1)
-		msr_s	ICH_HCR_EL2,x0
+	mov     x0,#(ICH_EL2_TALL1)
+	msr_s	ICH_HCR_EL2,x0
 /*
- * disable hcr IMO
-*/
-       	mov     w1, #0x1
+ /* disable hcr IMO */
+
+      	mov     w1, #0x1
        	mov     x0, #1
        	lsl     x0, x0, #31
        	orr     x0, x0, x1
        	msr     hcr_el2, x0
 
-	   	pop x0,x1
+   	pop x0,x1
        	eret
 ENDPROC(EL1_64_irq)
 
@@ -322,17 +326,17 @@ ENTRY(__hyplet_vectors)
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t
 
-        invalid_vector  ELx_sync, #5  	              						// Current EL with SPx
+        invalid_vector  ELx_sync, #5 	// Current EL with SPx
         invalid_vector  EL2_irq_invalidELSpx,#6                 // IRQ EL2h
         invalid_vector  EL2_fiq_invalidELSpx,#7                 // FIQ EL2h
         invalid_vector  EL2_error_invalidELspx,#8               // Error EL2h
 
-        ventry  		EL1_sync                        			// Synchronous 64-bit EL1
-        ventry  		EL1_64_irq
+        ventry		EL1_sync       	// Synchronous 64-bit EL1
+        ventry  	EL1_64_irq
         invalid_vector  EL1_fiq_invalid, #9                // FIQ 64-bit EL1
         invalid_vector  EL1_error_invalid ,#10             // Error 64-bit EL1
 
-        invalid_vector	EL132_irq,#17  	          					// Synchronous 32-bit EL1
+        invalid_vector	EL132_irq,#17  		// Synchronous 32-bit EL1
         invalid_vector  EL1_irq_invalid, #11                 		// IRQ 32-bit EL1
         invalid_vector  EL1_fiq_invalidLowEL32 ,#12               // FIQ 32-bit EL1
         invalid_vector  EL1_error_invalidLowEL32,#13               // Error 32-bit EL1

@@ -180,6 +180,7 @@ int main(void)
   DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  hyplet_code));
   DEFINE(HYPLET_GIC_IRQ, offsetof(struct hyplet_vm, gic_irq));
   DEFINE(HYPLET_ICH_HCR_EL2, offsetof(struct hyplet_vm, ich_hcr_el2));
+  DEFINE(HYPLET_CNT, offsetof(struct hyplet_vm, int_cnt));
  
   return 0;
 }

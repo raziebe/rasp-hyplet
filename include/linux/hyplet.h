@@ -117,7 +117,7 @@ struct hyp_addr {
 };
 
 struct hyplet_vm {
-
+	unsigned long int_cnt;
 	unsigned long gic_irq;
 	unsigned long irq_to_trap;
 	unsigned long hyplet_stack;
@@ -144,16 +144,11 @@ struct hyplet_vm {
    	char print_buf[1024];
 } __attribute__ ((aligned (8)));
 
-static inline struct hyplet_vm *hyplet_get_vm(void){
-	struct hyplet_vm *tv;
-    asm("mrs %0,tpidr_el2\n":"=r"(tv));
-	return tv;
-}
-
 extern char __hyplet_vectors[];
 
+struct hyplet_vm *hyplet_get_vm(void);
 unsigned long get_el1_irq(void);
-struct hyplet_vm* hyplet_vm(void);
+
 int  hyplet_init(void);
 void hyplet_clone_vm(void *);
 void hyplet_smp_run_hyp(void);
@@ -164,7 +159,8 @@ void hyplet_exit_el1(void *hyp_func,...);
 void hyplet_enter_el1(void *hyp_func,...);
 unsigned long hyplet_get_tcr_el1(void);
 unsigned long hyplet_get_hcr_el2(void);
-unsigned long hyplet_get_ttbr0_el2(void);
+
+unsigned long hyplet_get_ttbr0_el1(void);
 void hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long hyplet_get_vectors(void);
 int create_hyp_mappings(void *, void *);
@@ -180,6 +176,7 @@ void hyplet_invld_tlb(unsigned long);
 void hyplet_free_mem(void);
 void hyplet_reset(struct task_struct *tsk);
 void hyp_user_unmap(unsigned long umem,int size);
+int hyplet_ctl(unsigned long arg);
 
 #define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
 extern int __create_hyp_mappings(pgd_t *pgdp,

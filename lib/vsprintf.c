@@ -1845,10 +1845,12 @@ int __hyp_text vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 	/* Reject out-of-range values early.  Large positive sizes are
 	   used for unknown buffer sizes. */
+#ifdef __HYPLET__
 	if (!is_hyp()){
 	    if (WARN_ON_ONCE(size > INT_MAX))
 			return 0;
 	}
+#endif
 	str = buf;
 	end = buf + size;
 
@@ -1872,9 +1874,11 @@ int __hyp_text vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 			if (str < end) {
 				if (copy > end - str)
 					copy = end - str;
+#ifdef __HYPLET__
 				if (is_hyp())
 					el2_memcpy(str,old_fmt,copy);
 				else
+#endif
 					memcpy(str, old_fmt, copy);
 			}
 			str += read;
