@@ -71,10 +71,10 @@ EL1_sync:
 	mrs		x1, esr_el2
 	lsr		x2, x1, #ESR_ELx_EC_SHIFT	// Syndrom register shift by 26 bits
 
-	cmp	x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
-	beq	2f
-	cmp x2,#ESR_ELx_EC_SYS64
-	b.eq do_msr
+	cmp		x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
+	beq		2f
+	cmp 	x2,#ESR_ELx_EC_SYS64
+	b.eq 	trap_msr
 	b 3f
 
 	/* Here, we're pretty sure the host called HVC */
@@ -111,12 +111,12 @@ ENDPROC(EL1_sync)
   *    if not then just exit
 
 */
-do_msr:
-    	mrs	x0, tpidr_el2
-    	mrs_s  	x1, ICC_IAR1_EL1
-    	isb
+trap_msr:
+    mrs	x0, tpidr_el2
+    mrs_s  	x1, ICC_IAR1_EL1
+    isb
 	mov	 x2, xzr
-	ldr      x2,[x0, HYPLET_TRAP_IRQ]
+	ldr  x2,[x0, #HYPLET_TRAP_IRQ]
 	cmp	 x2, x1
 	bne	 2f
 /*
@@ -128,47 +128,49 @@ do_msr:
 	mrs	x2, sp_el0
 	push    x1, x2
 
-	ldr	x1,[x0, HYPLET_TTBR0_EL1]
+	ldr	x1,[x0, #HYPLET_TTBR0_EL1]
 	msr	ttbr0_el1, x1
-	ldr	x1,[x0, HYPLET_STACK]
+	ldr	x1,[x0, #HYPLET_STACK]
 	msr	sp_el0,x1
-	ldr	x30,[x0, HYPLET_CODE]
+	ldr	x30,[x0, #HYPLET_CODE]
 
 /*  EL2t. Switch stacks */
-    	mrs  x1, spsel
-    	and  w1,w1,#0xFFFFFFFE
-    	msr  spsel,x1
+	mrs  x1, spsel
+	and  w1,w1,#0xFFFFFFFE
+	msr  spsel,x1
 
 	blr x30 // Execute hyplet in EL2
 
 /*
  * switch stacks back
 */
-    	mrs x1, spsel
-    	orr w1, w1, #0x1
-    	msr spsel,x1
+	mrs x1, spsel
+	orr w1, w1, #0x1
+	msr spsel,x1
 
-	pop     x1,x2
+	pop  x1,x2
 	msr	ttbr0_el1,x1
 	msr	sp_el0, x2
 	pop_registers
 
 /*
  * Disable access untill the next
- * interrupt will take place
+ * interrupt takes place
 */
 2:
-    	str    	x1,[x0, #HYPLET_GIC_IRQ]
-	mrs	x1, elr_el2
-	add	x1, x1, #4
-	msr	elr_el2,x1
-	msr_s	ICH_HCR_EL2,xzr
+	str	x1,[x0, #HYPLET_GIC_IRQ]
+//	mrs	x1, elr_el2
+//	add	x1, x1, #4
+//	msr	elr_el2,x1
+	mrs_s   x1, ICH_HCR_EL2
+	bic		x1, x1, #ICH_EL2_TALL1
+	msr_s	ICH_HCR_EL2, x1
 1:
 	pop x2,x3
 	pop x0,x1
 
 	eret
-ENDPROC(do_msr)
+ENDPROC(trap_msr)
 
 /* borrowed from kvm */
 __hyplet_panic:
@@ -268,16 +270,16 @@ ENTRY(hyplet_run_vm)
 	msr	tpidr_el2, x0	// save tvm context
 
 	ldr	x1, [x0, #HYPLET_HCR_EL2]
-   	 msr     hcr_el2, x1
+	msr     hcr_el2, x1
 
  	ldr 	x1, [x0, #HYPLET_HSTR_EL2]
 	msr 	hstr_el2, x1
 
-    	ldr	x1, [x0, #HYPLET_VTCR_EL2]
+	ldr	x1, [x0, #HYPLET_VTCR_EL2]
 	msr	vtcr_el2, x1
 
-    	ldr     x1, [x0, #HYPLET_VTTBR_EL2]
-    	msr 	vttbr_el2, x1
+	ldr     x1, [x0, #HYPLET_VTTBR_EL2]
+	msr 	vttbr_el2, x1
 
 	mov	lr,x3
 
@@ -296,7 +298,7 @@ ENDPROC(hyplet_run_vm)
 EL1_64_irq:
 	push x0,x1
 /* debug counter */
-    	mrs	x0, tpidr_el2
+	mrs	x0, tpidr_el2
 	ldr	x1,[x0, #HYPLET_CNT]
 	add	x1,x1,  #1
 	str	x1,[x0, #HYPLET_CNT]
@@ -309,14 +311,14 @@ EL1_64_irq:
 /*
  /* disable hcr IMO */
 
-      	mov     w1, #0x1
-       	mov     x0, #1
-       	lsl     x0, x0, #31
-       	orr     x0, x0, x1
-       	msr     hcr_el2, x0
+	mov     w1, #0x1
+	mov     x0, #1
+	lsl     x0, x0, #31
+	orr     x0, x0, x1
+	msr     hcr_el2, x0
 
    	pop x0,x1
-       	eret
+	eret
 ENDPROC(EL1_64_irq)
 
 .align 11
