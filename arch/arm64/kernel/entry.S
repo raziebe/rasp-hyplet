@@ -378,7 +378,8 @@ ENTRY(el1_irq)
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
 #endif
-#ifdef __HYPLET__
+
+#ifdef CONFIG_HYPLET
 	bl hyplet_imo
 #endif
 	kernel_exit 1
