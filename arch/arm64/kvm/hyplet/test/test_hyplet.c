@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "user_hyplet.h"
+#include "test_hyplet.h"
 
 int irq = 0;
 int loops = 10000;
@@ -28,10 +29,14 @@ long dt_max = 0;
 long dt_min = 100000;
 long dt_zeros = 0;
 
+int* hist=NULL;
+
+
 #define DT_HIKEY 1200
 
 long user_hyplet(void *opaque)
 {
+	int times_offset= 0;
 	long dt;
 	long curtick = cycles();
 
@@ -43,8 +48,10 @@ long user_hyplet(void *opaque)
 		dt_max  = dt;
 	if (dt_min >  dt)
 		dt_min = dt;
-	if (dt == DT_HIKEY)
-		dt_zeros++;
+	
+	times_offset = dt - DT_HIKEY;
+	if (times_offset < HIST_SIZE && times_offset >= 0)
+		hist[times_offset]++;
 	count++;
 }
 
@@ -104,6 +111,13 @@ int hyplet_start(int hyplet_code_size)
 		return -1;
 	}
 
+	heap_sz = sizeof(int) * HIST_SIZE;
+	hist = malloc(heap_sz);
+	memset(hist, 0x00, heap_sz);
+	if (hyplet_map(HYPLET_MAP_ANY, hist, heap_sz)) {
+		fprintf(stderr, "hyplet: Failed to map a heap\n");
+		return -1;
+	}
 	if (hyplet_trap_irq(irq)) {
 		printf("hyplet: Failed to map user's data\n");
 		return -1;
