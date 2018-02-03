@@ -36,7 +36,7 @@ int take_options(int argc, char *argv[])
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "pl:i:")) != -1) {
+	while ((opt = getopt(argc, argv, "l:i:")) != -1) {
 		switch (opt) {
 		case 'i':
 			irq = atoi(optarg);
@@ -109,13 +109,16 @@ int main(int argc, char *argv[])
 	int rc;
 
 	rc = take_options(argc, argv);
-	if (rc < 0)
+	if (rc < 0){
 		return -1;
+	}
+
 	hyplet_start();
 
 	while (1) {
 		sleep(1);
 		if (count >= loops)
 			break;
+		printf("count %d loops %d\n",count,loops);
 	}
 }
