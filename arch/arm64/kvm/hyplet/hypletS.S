@@ -225,19 +225,6 @@ ENTRY(hyplet_set_vectors)
 ENDPROC(hyplet_set_vectors)
 
 
-/*
- * Call into the vgic backend for state saving
- */
-ENTRY(hyplet_get_vgic_ver)
-alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-        mov  x0,#2
-alternative_else
-	mov x0, #3
-alternative_endif
-	ret
-ENDPROC(hyplet_get_vgic_ver)
-
-
 ENTRY(hyplet_call_hyp)
         hvc	#0
         ret
