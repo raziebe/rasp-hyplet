@@ -21,15 +21,31 @@
 #include "user_hyplet.h"
 
 int irq = 0;
-int some_global = 0;
 int loops = 10000;
 int count = 0;
-long *times;
+long prev_tick = 0;
+long dt_max = 0;
+long dt_min = 100000;
+long dt_zeros = 0;
+
+#define DT_HIKEY 1200
 
 long user_hyplet(void *opaque)
 {
-	if (count < loops)
-		times[count++] = cycles();
+	long dt;
+	long curtick = cycles();
+
+	if (prev_tick != 0){
+		dt = curtick - prev_tick;		
+	}
+	prev_tick = curtick;
+	if (dt_max < dt)
+		dt_max  = dt;
+	if (dt_min >  dt)
+		dt_min = dt;
+	if (dt == DT_HIKEY)
+		dt_zeros++;
+	count++;
 }
 
 int take_options(int argc, char *argv[])
@@ -56,15 +72,14 @@ int take_options(int argc, char *argv[])
 }
 
 
-int hyplet_start(void)
+int hyplet_start(int hyplet_code_size)
 {
 	int rc;
 	int stack_size = sysconf(_SC_PAGESIZE) * 50;
 	void *stack_addr;
 	int heap_sz;
-	int func_size = 4 * 4;
 
-	if (hyplet_map(HYPLET_MAP_CODE, user_hyplet, func_size)) {
+	if (hyplet_map(HYPLET_MAP_CODE, user_hyplet, hyplet_code_size)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
@@ -84,16 +99,8 @@ int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &some_global, -1)) {
+	if (hyplet_map(HYPLET_MAP_ANY, &prev_tick, -1)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
-		return -1;
-	}
-
-	heap_sz = sizeof(long) * loops;
-	times = malloc(heap_sz);
-	memset(times, 0x00, heap_sz);
-	if (hyplet_map(HYPLET_MAP_ANY, times, heap_sz)) {
-		fprintf(stderr, "hyplet: Failed to map the heap\n");
 		return -1;
 	}
 
@@ -104,21 +111,3 @@ int hyplet_start(void)
 
 }
 
-int main(int argc, char *argv[])
-{
-	int rc;
-
-	rc = take_options(argc, argv);
-	if (rc < 0){
-		return -1;
-	}
-
-	hyplet_start();
-
-	while (1) {
-		sleep(1);
-		if (count >= loops)
-			break;
-		printf("count %d loops %d\n",count,loops);
-	}
-}
