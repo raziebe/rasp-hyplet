@@ -44,10 +44,6 @@ void make_hcr_el2(struct hyplet_vm *tvm)
 	tvm->hcr_el2 =  HCR_IMO | HCR_RW;
 }
 
-void make_mdcr_el2(struct hyplet_vm *tvm)
-{
-	tvm->mdcr_el2 = 0x00;
-}
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
@@ -141,41 +137,11 @@ void hyplet_map_tvm(void)
 
 }
 
-
-int __hyp_text el2_vsprintf(char *buf, const char *fmt, va_list args)
-{
-	return vsnprintf(buf, INT_MAX, fmt, args);
-}
-
 int __hyp_text is_hyp(void)
 {
         u64 el;
         asm("mrs %0,CurrentEL" : "=r" (el));
         return el == CurrentEL_EL2;
-}
-
-
-void __hyp_text el2_memcpy(char *dst,const char *src,int bytes)
-{
-	int i = 0;
-	for (;i < bytes ; i++)
-		dst[i] = src[i];
-}
-/*
- * Executed in EL2
- */
-void __hyp_text el2_sprintf(const char *fmt, ...)
-{
-	va_list args;
-	char *buf;
-	int printed;
-	struct hyplet_vm *tvm = hyplet_get_vm();
-
-	buf =  (char *)(&tvm->print_buf[0]);
-
-	va_start(args, fmt);
-	printed = el2_vsprintf(buf, fmt, args);
-	va_end(args);
 }
 
 void hyplet_prepare_vm(void *x)

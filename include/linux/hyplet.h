@@ -89,6 +89,7 @@ typedef enum { HYPLET_MAP_CODE = 1,
 	   HYPLET_MAP_ANY= 3,
 	   HYPLET_TRAP_IRQ = 4,
 	   HYPLET_UNTRAP_IRQ = 5,
+	   HYPLET_REGISTER_BH = 6, // register the task to wake up
 }hyplet_ops;
 
 #define USER_CODE_MAPPED		UL(1) << 1
@@ -127,21 +128,18 @@ struct hyplet_vm {
 	void *task_struct;
 	unsigned long hcr_el2;
 
-	unsigned int  hstr_el2;
- 	unsigned long vttbr_el2;
- 	unsigned int  vtcr_el2;
- 	unsigned long mdcr_el2;
- 	unsigned long elr_el2;
- 	unsigned long el2_sp;
+//	unsigned int  hstr_el2;
+// 	unsigned long vttbr_el2;
+// 	unsigned int  vtcr_el2;
+// 	unsigned long mdcr_el2;
+// 	unsigned long elr_el2;
+// 	unsigned long el2_sp;
  	unsigned long el1_sp;
  	unsigned long ich_hcr_el2;
  	struct list_head hyp_addr_lst;
  	unsigned int state;
+ 	unsigned long initialized;
 
- 	unsigned long initialized; 	
- 	unsigned long id_aa64mmfr0_el1;
-   	void* pg_lvl_one;
-   	char print_buf[1024];
 } __attribute__ ((aligned (8)));
 
 extern char __hyplet_vectors[];

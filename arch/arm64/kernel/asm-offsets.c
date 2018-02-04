@@ -168,11 +168,6 @@ int main(void)
   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
 
   DEFINE(HYPLET_HCR_EL2, offsetof(struct hyplet_vm,  hcr_el2));
-  DEFINE(HYPLET_ELR_EL2, offsetof(struct hyplet_vm,  elr_el2));
-  DEFINE(HYPLET_HSTR_EL2 , offsetof(struct hyplet_vm,  hstr_el2));
-  DEFINE(HYPLET_VTTBR_EL2 , offsetof(struct hyplet_vm,  vttbr_el2));
-  DEFINE(HYPLET_VTCR_EL2 , offsetof(struct hyplet_vm,  vtcr_el2));
-  DEFINE(HYPLET_EL2_SP, offsetof(struct hyplet_vm,  el2_sp));
   DEFINE(HYPLET_EL1_SP, offsetof(struct hyplet_vm,  el1_sp));
   DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
   DEFINE(HYPLET_TTBR0_EL1 , offsetof(struct hyplet_vm,  ttbr0_el1));
