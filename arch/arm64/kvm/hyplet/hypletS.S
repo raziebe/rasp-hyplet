@@ -159,9 +159,6 @@ trap_msr:
 */
 2:
 	str	x1,[x0, #HYPLET_GIC_IRQ]
-//	mrs	x1, elr_el2
-//	add	x1, x1, #4
-//	msr	elr_el2,x1
 	mrs_s   x1, ICH_HCR_EL2
 	bic		x1, x1, #ICH_EL2_TALL1
 	msr_s	ICH_HCR_EL2, x1
@@ -234,11 +231,9 @@ ENDPROC(hyplet_call_hyp)
  * call right after EOI.
 */
 ENTRY(hyplet_enable_imo)
-	mov		w1, #0x1
 	mov		x0, #1
-	lsl		w0, w0, #31
-	orr		x0, x0, x1
-	orr		x0, x0, #16
+	lsl     x0, x0, #HCR_RW_SHIFT
+	orr		x0,x0, #HCR_IMO
 	msr		hcr_el2, x0
   	ret
 ENDPROC(hyplet_enable_imo)
@@ -256,17 +251,8 @@ ENTRY(hyplet_run_vm)
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-	ldr	x1, [x0, #HYPLET_HCR_EL2]
+	ldr		x1, [x0, #HYPLET_HCR_EL2]
 	msr     hcr_el2, x1
-
- 	ldr 	x1, [x0, #HYPLET_HSTR_EL2]
-	msr 	hstr_el2, x1
-
-	ldr	x1, [x0, #HYPLET_VTCR_EL2]
-	msr	vtcr_el2, x1
-
-	ldr     x1, [x0, #HYPLET_VTTBR_EL2]
-	msr 	vttbr_el2, x1
 
 	mov	lr,x3
 
@@ -297,11 +283,8 @@ EL1_64_irq:
 	msr_s	ICH_HCR_EL2,x0
 /*
  /* disable hcr IMO */
-
-	mov     w1, #0x1
 	mov     x0, #1
-	lsl     x0, x0, #31
-	orr     x0, x0, x1
+	lsl     x0, x0, #HCR_RW_SHIFT
 	msr     hcr_el2, x0
 
    	pop x0,x1

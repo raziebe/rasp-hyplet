@@ -41,7 +41,7 @@ unsigned long hyplet_get_ttbr0_el1(void)
 
 void make_hcr_el2(struct hyplet_vm *tvm)
 {
-	tvm->hcr_el2 =  HYPLET_HCR_GUEST_FLAGS;
+	tvm->hcr_el2 =  HCR_IMO | HCR_RW;
 }
 
 void make_mdcr_el2(struct hyplet_vm *tvm)
@@ -104,29 +104,12 @@ static void init_procfs(void)
 */
 int hyplet_init(void)
 {
-	long long tcr_el1;
-	int t0sz;
-	int t1sz;
-	int ips;
-	int pa_range;
-	long id_aa64mmfr0_el1;
 	struct hyplet_vm *_tvm;
 	int cpu = 0;
 
-	id_aa64mmfr0_el1 = hyplet_get_mfr();
-	tcr_el1 = hyplet_get_tcr_el1();
-
-	t0sz = tcr_el1 & 0b111111;
-	t1sz = (tcr_el1 >> 16) & 0b111111;
-	ips = (tcr_el1 >> 32) & 0b111;
-	pa_range = id_aa64mmfr0_el1 & 0b1111;
-
 	_tvm = hyplet_get_vm();
 	memset(_tvm, 0x00, sizeof(*_tvm));
-	hyplet_create_pg_tbl(_tvm);
-	make_vtcr_el2(_tvm);
 	make_hcr_el2(_tvm);
-	make_mdcr_el2(_tvm);
 
 	for_each_possible_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
