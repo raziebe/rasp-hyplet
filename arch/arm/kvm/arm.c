@@ -985,7 +985,7 @@ static void cpu_init_hyp_mode(void *dummy)
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 
 #ifdef __HYPLET__
-	hyplet_prepare_vm(NULL);
+	hyplet_setup();
 #endif
 }
 

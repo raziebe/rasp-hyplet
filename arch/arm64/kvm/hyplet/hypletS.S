@@ -237,7 +237,7 @@ ENTRY(hyplet_enable_imo)
 ENDPROC(hyplet_enable_imo)
 
 
-ENTRY(hyplet_run_vm)
+ENTRY(hyplet_on)
 
 	pop	lr, xzr
 
@@ -248,9 +248,7 @@ ENTRY(hyplet_run_vm)
 
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
-
-	ldr		x1, [x0, #HYPLET_HCR_EL2]
-	msr     hcr_el2, x1
+	bl hyplet_enable_imo
 
 	mov	lr,x3
 
@@ -258,7 +256,7 @@ ENTRY(hyplet_run_vm)
 	pop 	x0,x1
 
 	eret
-ENDPROC(hyplet_run_vm)
+ENDPROC(hyplet_on)
 
 /*
  * All interrupts walks through this section

@@ -25,26 +25,6 @@ struct hyplet_vm* hyplet_get_vm(void)
 	return this_cpu_ptr(&TVM);
 }
 
-long hyplet_get_mfr(void)
-{
-	long e = 0;
-	asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
-	return e;
-}
-
-unsigned long hyplet_get_ttbr0_el1(void)
-{
-      unsigned long ttbr0_el1;
-      asm("mrs %0,ttbr0_el1\n":"=r" (ttbr0_el1));
-      return ttbr0_el1;
-}
-
-void make_hcr_el2(struct hyplet_vm *tvm)
-{
-	tvm->hcr_el2 =  HCR_IMO | HCR_RW;
-}
-
-
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
 {
@@ -105,7 +85,7 @@ int hyplet_init(void)
 
 	_tvm = hyplet_get_vm();
 	memset(_tvm, 0x00, sizeof(*_tvm));
-	make_hcr_el2(_tvm);
+
 
 	for_each_possible_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
@@ -144,7 +124,7 @@ int __hyp_text is_hyp(void)
         return el == CurrentEL_EL2;
 }
 
-void hyplet_prepare_vm(void *x)
+void hyplet_setup(void)
 {
 	struct hyplet_vm *tvm = this_cpu_ptr(&TVM);
 	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__hyplet_vectors);
@@ -158,7 +138,7 @@ void hyplet_prepare_vm(void *x)
 		hyplet_set_vectors(vbar_el2);
 	}
 	tvm->gic_irq = 0;
-	hyplet_call_hyp(hyplet_run_vm, tvm, NULL);
+	hyplet_call_hyp(hyplet_on, tvm, NULL);
 }
 
 int is_hyplet_on(void)

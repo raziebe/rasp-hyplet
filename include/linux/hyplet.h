@@ -125,8 +125,7 @@ struct hyplet_vm {
 	unsigned long hyplet_code;
 
 	void *task_struct;
-	unsigned long hcr_el2;
-	unsigned long el1_sp;
+
  	struct list_head hyp_addr_lst;
  	unsigned int state;
  	unsigned long initialized;
@@ -136,25 +135,15 @@ struct hyplet_vm {
 extern char __hyplet_vectors[];
 
 struct hyplet_vm *hyplet_get_vm(void);
-unsigned long get_el1_irq(void);
-
 int  hyplet_init(void);
-void hyplet_clone_vm(void *);
 void hyplet_smp_run_hyp(void);
-void hyplet_run_vm(void *);
-void hyplet_prepare_vm(void *);
+void hyplet_on(void *);
+void hyplet_setup(void);
 long hyplet_call_hyp(void *hyper_func, ...);
-void hyplet_exit_el1(void *hyp_func,...);
-void hyplet_enter_el1(void *hyp_func,...);
-unsigned long hyplet_get_tcr_el1(void);
-unsigned long hyplet_get_hcr_el2(void);
-
-unsigned long hyplet_get_ttbr0_el1(void);
 void hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long hyplet_get_vectors(void);
 int create_hyp_mappings(void *, void *);
-unsigned long hyplet_create_pg_tbl(void *cxt);
-void make_vtcr_el2(struct hyplet_vm *tvm);
+
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);
 int hyplet_map_user_data(hyplet_ops ,  void *action);
 int hyplet_trap_irq(int irq);
@@ -167,16 +156,15 @@ void hyplet_reset(struct task_struct *tsk);
 void hyp_user_unmap(unsigned long umem,int size);
 int hyplet_ctl(unsigned long arg);
 
-#define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot);
 
 
 
-long hyplet_get_vgic_ver(void);
+//long hyplet_get_vgic_ver(void);
 void hyplet_enable_imo(void);
-void hyplet_imo(void);
+//void hyplet_imo(void);
 
 #define hyplet_info(fmt, ...) \
 		pr_info("hyplet %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)

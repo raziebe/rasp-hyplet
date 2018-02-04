@@ -37,20 +37,6 @@ void hyplet_imo(void)
 	}
 }
 
-
-/*
-  * 1. A user maps a stack and execution code
-  *      of a an available thread.
-  * 2. hyplet_ctl responsibilities
-  *   Map function
-  *   Map stack
-  *   hyplet start
-  *   	Set the trapped irq
-  *   	Cache hyp_uthread task_struct
-  *   	Cache ttbr0_el1
-  *
-  * Please see hyplet_user.c for example
-*/
 int hyplet_ctl(unsigned long arg)
 {
 	struct hyplet_vm *tvm = hyplet_get_vm();
@@ -135,8 +121,6 @@ int hyplet_untrap_irq(int irq)
 	hyplet_reset(current);
 	return 0;
 }
-
-
 
 void hyplet_reset(struct task_struct *tsk)
 {
