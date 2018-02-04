@@ -128,8 +128,6 @@ trap_msr:
 	mrs	x2, sp_el0
 	push    x1, x2
 
-	ldr	x1,[x0, #HYPLET_TTBR0_EL1]
-	msr	ttbr0_el1, x1
 	ldr	x1,[x0, #HYPLET_STACK]
 	msr	sp_el0,x1
 	ldr	x30,[x0, #HYPLET_CODE]
@@ -149,7 +147,7 @@ trap_msr:
 	msr spsel,x1
 
 	pop  x1,x2
-	msr	ttbr0_el1,x1
+
 	msr	sp_el0, x2
 	pop_registers
 

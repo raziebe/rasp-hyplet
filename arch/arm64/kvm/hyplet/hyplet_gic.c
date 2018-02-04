@@ -103,8 +103,7 @@ int hyplet_trap_irq(int irq)
 		hyplet_err("Incorrect irq %d\n",irq);
 		return -EINVAL;
 	}
-	// save context
-	tv->ttbr0_el1 = hyplet_get_ttbr0_el1();
+
 	tv->task_struct = current;
 	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
 		return -EINVAL;
@@ -150,7 +149,6 @@ void hyplet_reset(struct task_struct *tsk)
 	mb();
 	hyplet_free_mem();
 	tv->state  = 0;
-	tv->ttbr0_el1 = 0;
 	tv->task_struct = NULL;
 	hyplet_info("reset pid=%d\n",tsk->pid);
 }

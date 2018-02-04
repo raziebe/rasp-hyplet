@@ -170,11 +170,10 @@ int main(void)
   DEFINE(HYPLET_HCR_EL2, offsetof(struct hyplet_vm,  hcr_el2));
   DEFINE(HYPLET_EL1_SP, offsetof(struct hyplet_vm,  el1_sp));
   DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
-  DEFINE(HYPLET_TTBR0_EL1 , offsetof(struct hyplet_vm,  ttbr0_el1));
+//  DEFINE(HYPLET_TTBR0_EL1 , offsetof(struct hyplet_vm,  ttbr0_el1));
   DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
   DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  hyplet_code));
   DEFINE(HYPLET_GIC_IRQ, offsetof(struct hyplet_vm, gic_irq));
-  DEFINE(HYPLET_ICH_HCR_EL2, offsetof(struct hyplet_vm, ich_hcr_el2));
   DEFINE(HYPLET_CNT, offsetof(struct hyplet_vm, int_cnt));
  
   return 0;

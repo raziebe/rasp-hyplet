@@ -123,19 +123,10 @@ struct hyplet_vm {
 	unsigned long irq_to_trap;
 	unsigned long hyplet_stack;
 	unsigned long hyplet_code;
-	unsigned long ttbr0_el1;
 
 	void *task_struct;
 	unsigned long hcr_el2;
-
-//	unsigned int  hstr_el2;
-// 	unsigned long vttbr_el2;
-// 	unsigned int  vtcr_el2;
-// 	unsigned long mdcr_el2;
-// 	unsigned long elr_el2;
-// 	unsigned long el2_sp;
- 	unsigned long el1_sp;
- 	unsigned long ich_hcr_el2;
+	unsigned long el1_sp;
  	struct list_head hyp_addr_lst;
  	unsigned int state;
  	unsigned long initialized;
