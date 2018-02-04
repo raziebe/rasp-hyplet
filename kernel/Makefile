@@ -20,6 +20,10 @@ CFLAGS_REMOVE_irq_work.o = $(CC_FLAGS_FTRACE)
 endif
 
 KASAN_SANITIZE_unwind.o := n
+ifeq ($(CONFIG_HYPLET), y)
+CFLAGS_exit.o +=  -D__HYPLET__
+CFLAGS_sys.o += -D__HYPLET__
+endif
 
 # cond_syscall is currently not LTO compatible
 CFLAGS_sys_ni.o = $(DISABLE_LTO)

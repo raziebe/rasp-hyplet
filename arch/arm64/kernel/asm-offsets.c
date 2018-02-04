@@ -29,6 +29,8 @@
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
 
+#include "linux/hyplet.h"
+
 int main(void)
 {
   DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
@@ -163,5 +165,12 @@ int main(void)
   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
 #endif
+
+  DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
+  DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
+  DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  hyplet_code));
+  DEFINE(HYPLET_GIC_IRQ, offsetof(struct hyplet_vm, gic_irq));
+  DEFINE(HYPLET_CNT, offsetof(struct hyplet_vm, int_cnt));
+ 
   return 0;
 }

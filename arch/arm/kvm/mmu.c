@@ -34,7 +34,7 @@
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 
 static pgd_t *boot_hyp_pgd;
-static pgd_t *hyp_pgd;
+pgd_t *hyp_pgd;
 static pgd_t *merged_hyp_pgd;
 static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
 
@@ -541,7 +541,13 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-static int __create_hyp_mappings(pgd_t *pgdp,
+void hyp_user_unmap(unsigned long umem,int size)
+{
+        int sz_page = PAGE_ALIGN(size);
+        unmap_range(NULL, hyp_pgd, umem, sz_page);
+ }
+
+int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot)
 {
@@ -589,6 +595,28 @@ static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
 		       offset_in_page(kaddr);
 	}
 }
+
+unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
+{
+	unsigned long pfn;
+	struct page *pages[1];
+	int nr;
+
+	nr = get_user_pages(current,
+	                     current->mm,
+	                    uaddr,
+	                      1, 0,     /* write */
+	                      1,  /* force */
+	                    (struct page **)&pages, 0);
+	if (nr <= 0){
+	       printk("TP: INSANE: failed to get user pages %p\n",(void *)uaddr);
+	       return 0x00;
+	}
+	pfn = page_to_pfn(pages[0]);
+	page_cache_release(pages[0]);
+	return pfn;
+}
+
 
 /**
  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
@@ -870,9 +898,6 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
 	pmd_t *pmd;
 
 	pud = stage2_get_pud(kvm, cache, addr);
-	if (!pud)
-		return NULL;
-
 	if (pud_none(*pud)) {
 		if (!cache)
 			return NULL;
