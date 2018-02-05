@@ -70,7 +70,7 @@
 #define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 #define USER_TO_HYP(uva)	(uva)
-#define HYPLET_HCR_GUEST_FLAGS 	(HCR_RW | HCR_VM | HCR_IMO)
+#define HYPLET_HCR_FLAGS 	(HCR_RW)
 
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
@@ -134,27 +134,30 @@ struct hyplet_vm {
 
 extern char __hyplet_vectors[];
 
-struct hyplet_vm *hyplet_get_vm(void);
-int  hyplet_init(void);
-void hyplet_smp_run_hyp(void);
-void hyplet_on(void *);
-void hyplet_setup(void);
-long hyplet_call_hyp(void *hyper_func, ...);
-void hyplet_set_vectors(unsigned long vbar_el2);
-unsigned long hyplet_get_vectors(void);
-int create_hyp_mappings(void *, void *);
+struct 		hyplet_vm *hyplet_get_vm(void);
+int  		hyplet_init(void);
+void 		hyplet_smp_run_hyp(void);
+void 		hyplet_on(void *);
+void 		hyplet_setup(void);
+long 		hyplet_call_hyp(void *hyper_func, ...);
+void 		hyplet_set_vectors(unsigned long vbar_el2);
+unsigned long 	hyplet_get_vectors(void);
+int  		hyplet_map_user_data(hyplet_ops ,  void *action);
+int  		hyplet_trap_irq(int irq);
+int  		hyplet_untrap_irq(int irq);
+int  		hyplet_start(void);
+void 		hyplet_reset(struct task_struct *tsk);
+void 		hyplet_invld_tlb(unsigned long);
+void 		hyplet_free_mem(void);
+void 		hyplet_reset(struct task_struct *tsk);
+void 		hyp_user_unmap(unsigned long umem,int size);
+int  		hyplet_ctl(unsigned long arg);
+int  		hyplet_run(int irq);
+int  		hyplet_trapped_irq(void);
+int  		hyplet_run_user(void);
 
+int create_hyp_mappings(void *, void *);
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);
-int  hyplet_map_user_data(hyplet_ops ,  void *action);
-int  hyplet_trap_irq(int irq);
-int  hyplet_untrap_irq(int irq);
-int  hyplet_start(void);
-void hyplet_reset(struct task_struct *tsk);
-void hyplet_invld_tlb(unsigned long);
-void hyplet_free_mem(void);
-void hyplet_reset(struct task_struct *tsk);
-void hyp_user_unmap(unsigned long umem,int size);
-int  hyplet_ctl(unsigned long arg);
 
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,

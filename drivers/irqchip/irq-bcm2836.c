@@ -21,6 +21,10 @@
 #include <linux/irqdomain.h>
 #include <asm/exception.h>
 
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
+
 #define LOCAL_CONTROL			0x000
 #define LOCAL_PRESCALER			0x008
 
@@ -165,6 +169,10 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	u32 stat;
+#ifdef __HYPLET__
+	u32 hyplet_irq;
+	hyplet_irq = hyplet_trapped_irq();
+#endif
 
 	stat = readl_relaxed(intc.base + LOCAL_IRQ_PENDING0 + 4 * cpu);
 	if (stat & BIT(LOCAL_IRQ_MAILBOX0)) {
@@ -179,7 +187,11 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 #endif
 	} else if (stat) {
 		u32 hwirq = ffs(stat) - 1;
-
+#ifdef __HYPLET__
+		pr_debug("GIC: %d %d.",hwirq,hyplet_irq);
+		if (hwirq == hyplet_irq)
+			hyplet_run(hwirq);
+#endif
 		handle_domain_irq(intc.domain, hwirq, regs);
 	}
 }

@@ -2384,7 +2384,7 @@ SYSCALL_DEFINE1(hyplet, unsigned long, ctl)
 #ifdef __HYPLET__
 	return hyplet_ctl (ctl);
 #else
-	return -1;
+	return -ENOSYS;
 #endif
 }
 
