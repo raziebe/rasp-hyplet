@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "user_hyplet.h"
+#include <linux/hyplet_user.h>
 
 const int SYSCALL_HYPLET  = 285;
 

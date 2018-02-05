@@ -84,32 +84,10 @@ enum { ECB=0, CBC=1, CFB=2 };
 enum { DEFAULT_BLOCK_SIZE=16 };
 enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 
-typedef enum { HYPLET_MAP_CODE = 1,
-	   HYPLET_MAP_STACK = 2,
-	   HYPLET_MAP_ANY= 3,
-	   HYPLET_TRAP_IRQ = 4,
-	   HYPLET_UNTRAP_IRQ = 5,
-	   HYPLET_REGISTER_BH = 6, // register the task to wake up
-}hyplet_ops;
-
 #define USER_CODE_MAPPED		UL(1) << 1
 #define USER_STACK_MAPPED		UL(1) << 2
 #define USER_MEM_ANON_MAPPED	UL(1) << 3
 #define RUN_HYPLET				UL(1) << 4
-
-struct hyplet_map_addr {
-	unsigned long addr;
-	int size;
-};
-
-
-struct hyplet_ctrl {
-	int cmd  __attribute__ ((packed));
-	union  {
-		struct hyplet_map_addr addr;
-		int irq;
-	}__action  __attribute__ ((packed));
-};
 
 struct hyp_addr {
 	struct list_head lst;
@@ -118,9 +96,9 @@ struct hyp_addr {
 };
 
 struct hyplet_vm {
-	unsigned long int_cnt;
-	unsigned long gic_irq;
-	unsigned long irq_to_trap;
+	unsigned int int_cnt;
+	unsigned int gic_irq;
+	unsigned int irq_to_trap;
 	unsigned long hyplet_stack;
 	unsigned long hyplet_code;
 
@@ -142,7 +120,7 @@ void 		hyplet_setup(void);
 long 		hyplet_call_hyp(void *hyper_func, ...);
 void 		hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long 	hyplet_get_vectors(void);
-int  		hyplet_map_user_data(hyplet_ops ,  void *action);
+int  		hyplet_map_user_data(int ops ,  void *action);
 int  		hyplet_trap_irq(int irq);
 int  		hyplet_untrap_irq(int irq);
 int  		hyplet_start(void);
