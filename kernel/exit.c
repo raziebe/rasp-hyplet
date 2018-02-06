@@ -58,6 +58,9 @@
 #include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
 
 static void exit_mm(struct task_struct *tsk);
 
@@ -712,7 +715,9 @@ void do_exit(long code)
 			preempt_count());
 		preempt_count_set(PREEMPT_ENABLED);
 	}
-
+#ifdef __HYPLET__
+	hyplet_reset(tsk);
+#endif
 	/* sync mm's RSS info before statistics gathering */
 	if (tsk->mm)
 		sync_mm_rss(tsk->mm);

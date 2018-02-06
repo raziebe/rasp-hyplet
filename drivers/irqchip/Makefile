@@ -1,3 +1,8 @@
+
+ifeq ($(CONFIG_HYPLET), y)
+CFLAGS_irq-bcm2836.o  +=  -D__HYPLET__
+endif
+
 obj-$(CONFIG_IRQCHIP)			+= irqchip.o
 
 obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o

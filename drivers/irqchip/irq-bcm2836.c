@@ -21,6 +21,13 @@
 #include <linux/irqdomain.h>
 #include <asm/exception.h>
 
+
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
+
+
+
 /*
  * The low 2 bits identify the CPU that the GPU IRQ goes to, and the
  * next 2 bits identify the CPU that the GPU FIQ goes to.
@@ -160,6 +167,10 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	u32 stat;
+#ifdef __HYPLET__
+	u32 hyplet_irq;
+	hyplet_irq = hyplet_trapped_irq();
+#endif
 
 	stat = readl_relaxed(intc.base + LOCAL_IRQ_PENDING0 + 4 * cpu);
 	if (stat & 0x10) {
@@ -174,7 +185,11 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 #endif
 	} else {
 		u32 hwirq = ffs(stat) - 1;
-
+#ifdef __HYPLET__
+		pr_debug("GIC: %d %d.",hwirq,hyplet_irq);
+		if (hwirq == hyplet_irq)
+			hyplet_run(hwirq);
+#endif
 		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
 	}
 }

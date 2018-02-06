@@ -44,6 +44,8 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
 #include <asm/kvm_psci.h>
+#include <linux/hyplet.h>
+
 
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
@@ -954,6 +956,16 @@ long kvm_arch_vm_ioctl(struct file *filp,
 	}
 }
 
+static unsigned long get_hyp_vector(void)
+{
+#ifdef __HYPLET__
+	hyplet_info("Assign Hyplet vector\n");
+	return (unsigned long) __hyplet_vectors;
+#else
+	return (unsigned long)__kvm_hyp_vector;
+#endif
+}
+
 static void cpu_init_hyp_mode(void *dummy)
 {
 	phys_addr_t boot_pgd_ptr;
@@ -962,16 +974,20 @@ static void cpu_init_hyp_mode(void *dummy)
 	unsigned long stack_page;
 	unsigned long vector_ptr;
 
+	vector_ptr = get_hyp_vector();
 	/* Switch from the HYP stub to our own HYP init vector */
 	__hyp_set_vectors(kvm_get_idmap_vector());
-
 	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
 	pgd_ptr = kvm_mmu_get_httbr();
 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
 	hyp_stack_ptr = stack_page + PAGE_SIZE;
-	vector_ptr = (unsigned long)__kvm_hyp_vector;
 
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+
+#ifdef __HYPLET__
+	hyplet_setup();
+	return;
+#endif
 
 	kvm_arm_init_debug();
 }
@@ -982,6 +998,10 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_STARTING:
 	case CPU_STARTING_FROZEN:
+		hyplet_info("%lx %lx" ,
+				(long) __hyp_get_vectors() ,
+				(long) hyp_default_vectors);
+
 		if (__hyp_get_vectors() == hyp_default_vectors)
 			cpu_init_hyp_mode(NULL);
 		break;
@@ -1101,7 +1121,11 @@ static int init_hyp_mode(void)
 			goto out_free_context;
 		}
 	}
-
+#ifdef __HYPLET__
+	hyplet_init();
+	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+	return 0;
+#endif
 	/*
 	 * Execute the init code on each CPU.
 	 */

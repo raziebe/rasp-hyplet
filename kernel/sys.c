@@ -61,6 +61,10 @@
 #include <asm/io.h>
 #include <asm/unistd.h>
 
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -2350,6 +2354,16 @@ static int do_sysinfo(struct sysinfo *info)
 
 out:
 	return 0;
+}
+
+
+SYSCALL_DEFINE1(hyplet, unsigned long, ctl)
+{
+#ifdef __HYPLET__
+	return hyplet_ctl (ctl);
+#else
+	return -ENOSYS;
+#endif
 }
 
 SYSCALL_DEFINE1(sysinfo, struct sysinfo __user *, info)
