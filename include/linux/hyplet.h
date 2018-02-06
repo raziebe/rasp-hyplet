@@ -134,6 +134,7 @@ int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(void);
 int  		hyplet_run_user(void);
 int		hyplet_dump_irqs(void);
+int 		hyplet_hwirq_to_irq(int);
 
 int create_hyp_mappings(void *, void *);
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);

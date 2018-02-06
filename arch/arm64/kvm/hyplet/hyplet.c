@@ -18,14 +18,12 @@
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
-//DEFINE_PER_CPU(struct hyplet_vm, TVM);
-static struct hyplet_vm TVM1;
+DEFINE_PER_CPU(struct hyplet_vm, TVM);
 static struct proc_dir_entry *procfs = NULL;
 
 struct hyplet_vm* hyplet_get_vm(void)
 {
-	return &TVM1;
-	//return this_cpu_ptr(&TVM);
+	return this_cpu_ptr(&TVM);
 }
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
@@ -49,7 +47,7 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 
 	if (filp->private_data == 0x00)
 		return 0;
-/*
+
 	for_each_online_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
 		len += sprintf(page + len, "cpu%d cnt=%d irq=%d\n", 
@@ -57,7 +55,7 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 				   tv->int_cnt,
 			       	   tv->gic_irq);
 	}
-*/
+
 	filp->private_data = 0x00;
 	return len;
 }
@@ -87,15 +85,15 @@ int hyplet_init(void)
 
 	tv = hyplet_get_vm();
 	memset(tv, 0x00, sizeof(*tv));
-/*
+
 	for_each_possible_cpu(cpu) {
-		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
-		if (tv != _tvm) {
-			memcpy(tv, _tvm, sizeof(*_tvm));
+		struct hyplet_vm *t = &per_cpu(TVM, cpu);
+		if (tv != t) {
+			memcpy(t, tv, sizeof(*t));
 		}
-		INIT_LIST_HEAD(&tv->hyp_addr_lst);
+		INIT_LIST_HEAD(&t->hyp_addr_lst);
 	}
-*/
+
 	INIT_LIST_HEAD(&tv->hyp_addr_lst);
 	hyplet_info("sizeof hyplet %zd\n",sizeof(struct hyplet_ctrl));
 	init_procfs();

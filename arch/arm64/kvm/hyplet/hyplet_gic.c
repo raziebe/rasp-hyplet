@@ -77,27 +77,32 @@ int hyplet_ctl(unsigned long arg)
 int hyplet_dump_irqs(void)
 {
 	int i;
-	struct irq_desc *desc;
-	
-	for ( i = 0; i < NR_IRQS; i++){ 
-		desc  = irq_to_desc(i);
-		if (!desc) {
-			hyplet_err("Invalid irqs %d\n",i);
-			continue;
-		}
-		printk("%d : %ld\n", i,  desc->irq_data.hwirq);
+	for (i = 0; i < NR_IRQS; i++) {
+		int irq = hyplet_hwirq_to_irq(i);
+		printk("hwirq %d : irq %d\n", i, irq);
+	}
+	return 0;
+}
+
+int hyplet_search_irq(int lirq)
+{
+	int i;
+	for (i = 0; i < NR_IRQS; i++) {
+		int irq = hyplet_hwirq_to_irq(i);
+		if (irq == lirq)
+			return i;
 	}
 	return 0;
 }
 
 int hyplet_trap_irq(int irq)
 {
-	struct irq_desc *desc;
 	struct hyplet_vm *tv = hyplet_get_vm();
+	int hwirq;
 
-	desc  = irq_to_desc(irq);
-	if (!desc) {
-		hyplet_err("Incorrect irq %d\n",irq);
+	hwirq = hyplet_search_irq(irq);
+	if (hwirq == 0){
+		hyplet_err("invalid irq %d\n",irq);
 		return -EINVAL;
 	}
 
@@ -106,31 +111,14 @@ int hyplet_trap_irq(int irq)
 		return -EINVAL;
 	}
 	tv->state |= RUN_HYPLET;
-	tv->irq_to_trap = desc->irq_data.hwirq;
+	tv->irq_to_trap = hwirq;
+	hyplet_info("Trapping irq %d local irq %d\n", irq,hwirq);
 	mb();
-	hyplet_info("Trapping global irq %d : local irq is %d,%ld\n"
-			,irq ,tv->irq_to_trap, desc->irq_data.hwirq);
 	return 0;
 }
 
 int hyplet_untrap_irq(int irq)
 {
-	struct irq_desc *desc;
-	struct hyplet_vm *tv = hyplet_get_vm();
-
-	desc  = irq_to_desc(irq);
-	if (!desc) {
-		hyplet_err("Incorrect irq %d\n",irq);
-		return -EINVAL;
-	}
-
-	if (desc->irq_data.hwirq != tv->irq_to_trap){
-		hyplet_err("Incorrect hwirq %d because"
-					" local irq is %ld\n"
-				,tv->irq_to_trap,
-				desc->irq_data.hwirq);
-		return -EINVAL;
-	}
 	hyplet_reset(current);
 	return 0;
 }
@@ -139,7 +127,7 @@ int hyplet_run(int hwirq)
 {
 	struct hyplet_vm *tv = hyplet_get_vm();
 
-	if (tv->task_struct && hwirq == 8)
+	if (tv->task_struct && hwirq == tv->irq_to_trap)
         	hyplet_call_hyp(hyplet_run_user);
 
 	return 0; // TODO
