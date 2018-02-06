@@ -1,0 +1,58 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+DT_HIKEY	test_hyplet.c	35;"	d	file:
+HIST_SIZE	test_hyplet.h	6;"	d
+HYPLET_MAP_ANY	user_hyplet.h	/^	HYPLET_MAP_ANY = 3,$/;"	e	enum:__anon1
+HYPLET_MAP_CODE	user_hyplet.h	/^	HYPLET_MAP_CODE = 1,$/;"	e	enum:__anon1
+HYPLET_MAP_STACK	user_hyplet.h	/^	HYPLET_MAP_STACK = 2,$/;"	e	enum:__anon1
+HYPLET_SIZE	temp_header.h	4;"	d
+HYPLET_SIZE	test_hyplet.h	4;"	d
+HYPLET_TEST_OPEN_TIMER	user_hyplet.h	/^	HYPLET_TEST_OPEN_TIMER = 6,$/;"	e	enum:__anon1
+HYPLET_TEST_WAIT_TIMER	user_hyplet.h	/^	HYPLET_TEST_WAIT_TIMER = 7,$/;"	e	enum:__anon1
+HYPLET_TRAP_IRQ	user_hyplet.h	/^	HYPLET_TRAP_IRQ = 4,$/;"	e	enum:__anon1
+HYPLET_UNTRAP_IRQ	user_hyplet.h	/^	HYPLET_UNTRAP_IRQ = 5,$/;"	e	enum:__anon1
+SYSCALL_HYPLET	hyplet_utils.c	/^const int SYSCALL_HYPLET  = 285;$/;"	v
+_GNU_SOURCE	hyplet_utils.c	1;"	d	file:
+_GNU_SOURCE	simple_hyplet.c	11;"	d	file:
+_GNU_SOURCE	test_hyplet.c	12;"	d	file:
+__TEST_HYPLET_H__	temp_header.h	2;"	d
+__TEST_HYPLET_H__	test_hyplet.h	2;"	d
+__USER_HYPLET_H_	user_hyplet.h	2;"	d
+__action	user_hyplet.h	/^	}__action  __attribute__ ((packed));$/;"	m	struct:hyplet_ctrl	typeref:union:hyplet_ctrl::__anon2
+action	user_hyplet.h	/^	int action;$/;"	m	struct:hyplet_irq_action
+addr	user_hyplet.h	/^		struct hyplet_map_addr addr;$/;"	m	union:hyplet_ctrl::__anon2	typeref:struct:hyplet_ctrl::__anon2::hyplet_map_addr
+addr	user_hyplet.h	/^	unsigned long addr;$/;"	m	struct:hyplet_map_addr
+cmd	user_hyplet.h	/^	int cmd  __attribute__ ((packed));$/;"	m	struct:hyplet_ctrl
+count	test_hyplet.c	/^int count = 0;$/;"	v
+cycles	user_hyplet.h	/^static inline long cycles(void) {$/;"	f
+dt_max	test_hyplet.c	/^long dt_max = 0;$/;"	v
+dt_min	test_hyplet.c	/^long dt_min = 100000;$/;"	v
+dt_zeros	test_hyplet.c	/^long dt_zeros = 0;$/;"	v
+hist	test_hyplet.c	/^int* hist=NULL;$/;"	v
+hyplet_ctl	hyplet_utils.c	/^int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt)$/;"	f
+hyplet_ctrl	user_hyplet.h	/^struct hyplet_ctrl {$/;"	s
+hyplet_irq_action	user_hyplet.h	/^struct hyplet_irq_action {$/;"	s
+hyplet_map	hyplet_utils.c	/^int hyplet_map(int cmd, void *addr,int size)$/;"	f
+hyplet_map_addr	user_hyplet.h	/^struct hyplet_map_addr {$/;"	s
+hyplet_start	simple_hyplet.c	/^int hyplet_start(void)$/;"	f
+hyplet_start	test_hyplet.c	/^int hyplet_start(int hyplet_code_size)$/;"	f
+hyplet_test	hyplet_utils.c	/^int hyplet_test(int cmd)$/;"	f
+hyplet_trap_irq	hyplet_utils.c	/^int hyplet_trap_irq(int irq)$/;"	f
+hyplet_untrap_irq	hyplet_utils.c	/^int hyplet_untrap_irq(int irq)$/;"	f
+irq	simple_hyplet.c	/^int irq = 0;$/;"	v
+irq	test_hyplet.c	/^int irq = 0;$/;"	v
+irq	user_hyplet.h	/^		int irq;$/;"	m	union:hyplet_ctrl::__anon2
+irq	user_hyplet.h	/^	int irq;$/;"	m	struct:hyplet_irq_action
+loops	test_hyplet.c	/^int loops = 10000;$/;"	v
+main	main_test_hyplet.c	/^int main(int argc, char *argv[])$/;"	f
+main	simple_hyplet.c	/^int main(int argc, char *argv[])$/;"	f
+prev_tick	test_hyplet.c	/^long prev_tick = 0;$/;"	v
+size	user_hyplet.h	/^	int size;$/;"	m	struct:hyplet_map_addr
+some_global	simple_hyplet.c	/^int some_global = 0;$/;"	v
+take_options	test_hyplet.c	/^int take_options(int argc, char *argv[])$/;"	f
+user_hyplet	simple_hyplet.c	/^__attribute__((noinline, section("hyplet"))) long user_hyplet(void *opaque)$/;"	f
+user_hyplet	test_hyplet.c	/^long user_hyplet(void *opaque)$/;"	f

@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# This script compiles and links and the binary
+# We do some elf parsing here because we need to know the 
+# hyplet size in advance.
+#
+
+CC=/opt/truly/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc 
+READELF=/opt/truly/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-readelf
+
+$CC  -pthread  -c test_hyplet.c hyplet_utils.c 
+
+#$READELF -a test_hyplet.o |grep user_hyplet | grep FUNC > /tmp/sz
+#
+# create test_hyplet.h 
+#
+#cat temp_header.h > test_hyplet.h
+
+#HYPLET_SIZE=$((awk '{print $3}' /tmp/sz))
+#echo $HYPLET_SIZE >> test_hyplet.h
+
+#echo "\n"
+
+#echo "int hyplet_start(int hyplet_size);
+##endif
+#" >> test_hyplet.h
+
+#rm -f /tmp/sz
+
+$CC -pthread  -c main_test_hyplet.c
+
+$CC  -I ../../../../../include/  -pthread main_test_hyplet.o test_hyplet.o hyplet_utils.o -o  test_hyplet
+$CC  -I ../../../../../include/  simple_hyplet.c hyplet_utils.c -o  simple_hyplet
+
