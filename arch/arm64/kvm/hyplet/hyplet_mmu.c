@@ -167,13 +167,12 @@ int hyplet_map_user_data(int __type, void *action)
 	return -1;
 }
 
-void hyplet_free_mem(void)
+void hyplet_free_mem(struct hyplet_vm *tv)
 {
-        struct hyplet_vm *tv = hyplet_get_vm();
         struct hyp_addr* tmp,*tmp2;
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
-        		hyp_user_unmap( tmp->addr , tmp->size);
+        	hyp_user_unmap( tmp->addr , tmp->size);
                 hyplet_call_hyp(hyplet_invld_tlb, tmp->addr);
                 list_del(&tmp->lst);
                 hyplet_info("unmap %lx\n",tmp->addr);

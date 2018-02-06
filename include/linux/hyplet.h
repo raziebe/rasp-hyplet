@@ -102,7 +102,7 @@ struct hyplet_vm {
 	unsigned long hyplet_stack;
 	unsigned long hyplet_code;
 
-	void *task_struct;
+	struct task_struct *tsk;
 
  	struct list_head hyp_addr_lst;
  	unsigned int state;
@@ -126,7 +126,7 @@ int  		hyplet_untrap_irq(int irq);
 int  		hyplet_start(void);
 void 		hyplet_reset(struct task_struct *tsk);
 void 		hyplet_invld_tlb(unsigned long);
-void 		hyplet_free_mem(void);
+void 		hyplet_free_mem(struct hyplet_vm *tv);
 void 		hyplet_reset(struct task_struct *tsk);
 void 		hyp_user_unmap(unsigned long umem,int size);
 int  		hyplet_ctl(unsigned long arg);
@@ -134,6 +134,9 @@ int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(void);
 int  		hyplet_run_user(void);
 int		hyplet_dump_irqs(void);
+int 		hyplet_hwirq_to_irq(int);
+void 		hyplet_stop(void *info);
+struct 		hyplet_vm* hyplet_get(int cpu);
 
 int create_hyp_mappings(void *, void *);
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);

@@ -17,7 +17,9 @@
 #include <errno.h>
 #include <string.h>
 
+#include <linux/hyplet_user.h>
 #include "hyplet_utils.h"
+
 
 int irq = 0;
 int some_global = 0;
@@ -78,8 +80,10 @@ int main(int argc, char *argv[])
 
 	printf("size of hyplet_ctrl %d\n",sizeof(struct hyplet_ctrl));
         if (argc <= 1 ){
+		struct hyplet_ctrl hyp;
                 printf("hyplet: must supply an irq , "
                         "please look in /proc/interrupts \n");
+		hyplet_ctl( HYPLET_DUMP_HWIRQ , &hyp );
                 return -1;
         }
 
