@@ -67,13 +67,31 @@ int hyplet_ctl(unsigned long arg)
 
 		case HYPLET_UNTRAP_IRQ:
 				return hyplet_untrap_irq(hplt.__action.irq);
+	
+	   	case HYPLET_DUMP_HWIRQ:
+				return hyplet_dump_irqs();
 	}
 	return rc;
 }
 
+int hyplet_dump_irqs(void)
+{
+	int i;
+	struct irq_desc *desc;
+	
+	for ( i = 0; i < NR_IRQS; i++){ 
+		desc  = irq_to_desc(i);
+		if (!desc) {
+			hyplet_err("Invalid irqs %d\n",i);
+			continue;
+		}
+		printk("%d : %ld\n", i,  desc->irq_data.hwirq);
+	}
+	return 0;
+}
+
 int hyplet_trap_irq(int irq)
 {
-	int i = 0;
 	struct irq_desc *desc;
 	struct hyplet_vm *tv = hyplet_get_vm();
 
