@@ -87,12 +87,16 @@ enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 #define USER_CODE_MAPPED		UL(1) << 1
 #define USER_STACK_MAPPED		UL(1) << 2
 #define USER_MEM_ANON_MAPPED	UL(1) << 3
-#define RUN_HYPLET				UL(1) << 4
+#define USER_NO_SIZE			UL(1) << 4
+//#define RUN_HYPLET				UL(1) << 5
 
 struct hyp_addr {
 	struct list_head lst;
 	unsigned long addr;
 	int size;
+	int type;
+	int nr_pages;
+
 };
 
 struct hyplet_vm {
@@ -128,7 +132,7 @@ void 		hyplet_reset(struct task_struct *tsk);
 void 		hyplet_invld_tlb(unsigned long);
 void 		hyplet_free_mem(struct hyplet_vm *tv);
 void 		hyplet_reset(struct task_struct *tsk);
-void 		hyp_user_unmap(unsigned long umem,int size);
+void 		hyplet_user_unmap(unsigned long umem);
 int  		hyplet_ctl(unsigned long arg);
 int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(void);

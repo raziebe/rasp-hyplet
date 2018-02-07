@@ -544,11 +544,10 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-void hyp_user_unmap(unsigned long umem,int size)
+void hyplet_user_unmap(unsigned long umem)
 {
-        int sz_page = PAGE_ALIGN(size);
-        unmap_range(NULL, hyp_pgd, umem, sz_page);
- }
+        unmap_range(NULL, hyp_pgd, umem, PAGE_SIZE);
+}
 
 int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
@@ -612,7 +611,7 @@ unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
 	                      1,  /* force */
 	                    (struct page **)&pages, 0);
 	if (nr <= 0){
-	       printk("TP: INSANE: failed to get user pages %p\n",(void *)uaddr);
+	       printk("hyplet: failed to get user pages %p\n",(void *)uaddr);
 	       return 0x00;
 	}
 	pfn = page_to_pfn(pages[0]);

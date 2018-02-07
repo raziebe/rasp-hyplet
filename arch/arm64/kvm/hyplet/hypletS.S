@@ -145,19 +145,21 @@ ENTRY(hyplet_invld_tlb)
 	ret
 ENDPROC(hyplet_invld_tlb)
 
-// x0 address
-// x1 size
+/* 
+  x0 address
+  x1 size
+*/
 ENTRY(hyplet_clear_cache)
 
-        push x1,x0
-        push x2,x3
+        push	x1, x0
+        push 	x2, x3
 
-        mrs  x3,ctr_el0
-        ubfx x3,x3,#16,#4
-        mov x3,#4 // x2=word size
-        lsl x2,x2,x3 // x2 cache line size
+        mrs 	x3, ctr_el0
+        ubfx	x3, x3,#16,#4 	// x3  = DminLine
+        mov		x2, #4   		// x2=word size
+        lsl		x2, x2, x3 		// x2 = smallet cache line size
 
-        add     x1, x0, x1 // end
+        add     x1, x0, x1 		// end
         tlbi    vaae1 ,x0
 
 1:      dc      civac, x0                       // clean & invalidate D line / unified line
@@ -170,10 +172,8 @@ ENTRY(hyplet_clear_cache)
         pop x2,	x3
         pop x1,	x0
         isb
-
         ret
 ENDPROC(hyplet_clear_cache)
-
 
 /*
 * This procedure calls the default hypervisor vector and
@@ -231,7 +231,6 @@ ENTRY(hyplet_run_user)
 	ret
 
 ENDPROC(hyplet_run_user)
-
 
 ENTRY(hyplet_on)
 

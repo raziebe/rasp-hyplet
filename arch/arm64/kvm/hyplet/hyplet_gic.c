@@ -113,7 +113,6 @@ int hyplet_trap_irq(int irq)
 	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
 		return -EINVAL;
 	}
-	tv->state |= RUN_HYPLET;
 	tv->irq_to_trap = hwirq;
 	hyplet_info("Trapping irq %d local irq %d\n", irq,hwirq);
 	mb();
