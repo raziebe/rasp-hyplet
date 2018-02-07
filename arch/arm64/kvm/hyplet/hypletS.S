@@ -145,6 +145,36 @@ ENTRY(hyplet_invld_tlb)
 	ret
 ENDPROC(hyplet_invld_tlb)
 
+// x0 address
+// x1 size
+ENTRY(hyplet_clear_cache)
+
+        push x1,x0
+        push x2,x3
+
+        mrs  x3,ctr_el0
+        ubfx x3,x3,#16,#4
+        mov x3,#4 // x2=word size
+        lsl x2,x2,x3 // x2 cache line size
+
+        add     x1, x0, x1 // end
+        tlbi    vaae1 ,x0
+
+1:      dc      civac, x0                       // clean & invalidate D line / unified line
+        ic      ivau, x0
+        dsb     ish
+        add     x0, x0, x2
+        cmp     x0, x1
+        b.lo    1b
+
+        pop x2,	x3
+        pop x1,	x0
+        isb
+
+        ret
+ENDPROC(hyplet_clear_cache)
+
+
 /*
 * This procedure calls the default hypervisor vector and
 * and sets truly vector. This is because when the cpu drops

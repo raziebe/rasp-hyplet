@@ -30,6 +30,9 @@
 #include <asm/kvm_emulate.h>
 
 #include "trace.h"
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
 
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 
@@ -220,7 +223,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 			/* No need to invalidate the cache for device mappings */
 			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
 				kvm_flush_dcache_pte(old_pte);
-
+			hyplet_clear_cache(pte, sizeof(pte_t));
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);

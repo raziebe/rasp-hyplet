@@ -137,9 +137,9 @@ int		hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
-
-int create_hyp_mappings(void *, void *);
-unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);
+unsigned long   hyplet_clear_cache(pte_t* addr,long size);
+int 		create_hyp_mappings(void *, void *);
+unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,

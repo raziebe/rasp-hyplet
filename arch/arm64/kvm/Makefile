@@ -4,12 +4,12 @@
 
 ccflags-y += -Iarch/arm64/kvm
 CFLAGS_arm.o := -I.
+CFLAGS_mmu.o := -I.
 
 ifeq ($(CONFIG_HYPLET), y)
 CFLAGS_arm.o +=  -D__HYPLET__
+CFLAGS_mmu.o +=  -D__HYPLET__
 endif
-
-CFLAGS_mmu.o := -I.
 
 KVM=../../../virt/kvm
 ARM=../../../arch/arm/kvm
