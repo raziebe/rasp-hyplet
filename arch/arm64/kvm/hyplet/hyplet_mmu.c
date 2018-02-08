@@ -6,7 +6,7 @@
 #include <asm/page.h>
 #include <asm/cacheflush.h>
 #include <linux/list.h>
-
+#include <linux/delay.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
@@ -152,7 +152,7 @@ void hyplet_free_mem(struct hyplet_vm *tv)
         struct hyp_addr* tmp,*tmp2;
         int i;
 
-
+	msleep(100);
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
         	hyplet_info("unmap %lx, %lx size=%d pages=%d\n",
@@ -171,11 +171,11 @@ void hyplet_free_mem(struct hyplet_vm *tv)
 
     		if (tmp->type & USER_CODE_MAPPED ){
     				flush_icache_range(tmp->addr,
-    							tmp->addr + tmp->size);
+    						tmp->addr + tmp->size);
     		}
 
-    		list_del(&tmp->lst);
-            kfree(tmp);
+		list_del(&tmp->lst);
+		kfree(tmp);
         }
 }
 
