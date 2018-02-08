@@ -7,14 +7,15 @@
 #include <string.h>
 
 #include "test_hyplet.h"
-#include "user_hyplet.h"
+#include <linux/hyplet_user.h>
 
-extern long dt_max,
-	dt_min,
-	dt_zeros;
+extern long 	dt_max,
+		dt_min,
+		dt_zeros;
 extern int loops;
 extern int count;
 extern int* hist;
+extern int hist_size;
 
 int main(int argc, char *argv[])
 {
@@ -26,6 +27,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	printf("PI3 test configuration: LPJ is 19.z Mhz , ie; 52ns a tick\n");
+
 	hyplet_start(HYPLET_SIZE);
 
 	while (1) {
@@ -34,7 +37,8 @@ int main(int argc, char *argv[])
 			break;
 	}
 
-	for (i =0 ; i < HIST_SIZE; i++)
+	for (i =0 ; i < hist_size; i++) {
 		if (hist[i] != 0)
-			printf("hist[%d] = %ld\n",i,hist[i]);
+			printf("hist[%d] = %ldns\n",i, hist[i] *52);
+	}
 }

@@ -18,8 +18,9 @@
 #include <errno.h>
 #include <string.h>
 
-#include "user_hyplet.h"
-#include "test_hyplet.h"
+#include <linux/hyplet_user.h>
+#include "hyplet_utils.h"
+
 
 int irq = 0;
 int loops = 10000;
@@ -31,8 +32,8 @@ long dt_zeros = 0;
 
 int* hist=NULL;
 
-
-#define DT_HIKEY 1200
+int hist_size	= 50;
+#define LPJ  19200
 
 long user_hyplet(void *opaque)
 {
@@ -49,8 +50,8 @@ long user_hyplet(void *opaque)
 	if (dt_min >  dt)
 		dt_min = dt;
 	
-	times_offset = dt - DT_HIKEY;
-	if (times_offset < HIST_SIZE && times_offset >= 0)
+	times_offset = dt - LPJ;
+	if (times_offset < hist_size && times_offset >= 0)
 		hist[times_offset]++;
 	count++;
 }
@@ -111,7 +112,7 @@ int hyplet_start(int hyplet_code_size)
 		return -1;
 	}
 
-	heap_sz = sizeof(int) * HIST_SIZE;
+	heap_sz = sizeof(int) * hist_size;
 	hist = malloc(heap_sz);
 	memset(hist, 0x00, heap_sz);
 	if (hyplet_map(HYPLET_MAP_ANY, hist, heap_sz)) {
