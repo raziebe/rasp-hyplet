@@ -2,49 +2,34 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <linux/gfp.h>
-#include <linux/highmem.h>
-#include <linux/compiler.h>
-#include <linux/linkage.h>
-#include <linux/linkage.h>
-#include <linux/init.h>
-#include <asm/sections.h>
-#include <linux/proc_fs.h>
 #include <linux/slab.h>
 #include <asm/page.h>
-#include <linux/vmalloc.h>
-#include <asm/fixmap.h>
-#include <asm/memory.h>
-#include <linux/blkdev.h>
-#include <asm/page.h>
-#include <linux/irqchip.h>
-#include <linux/irqchip/arm-gic-common.h>
-#include <linux/irqchip/arm-gic-v3.h>
-#include <asm/arch_gicv3.h>
+#include <asm/cacheflush.h>
 #include <linux/list.h>
-
+#include <linux/delay.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
 extern pgd_t *hyp_pgd;
 
 
-int create_hyp_user_mappings(void *from, void *to)
+int create_hyp_user_mappings(void *_from, void *_to)
 {
         unsigned long virt_addr;
-        unsigned long fr = (unsigned long)from;
-        unsigned long start = USER_TO_HYP((unsigned long)from);
-        unsigned long end = USER_TO_HYP((unsigned long)to);
-
+        unsigned long from = (unsigned long)_from & PAGE_MASK;
+        unsigned long start = USER_TO_HYP((unsigned long)_from);
+        unsigned long end = USER_TO_HYP((unsigned long)_to);
+        int nr_pages = 0;
 
         start = start & PAGE_MASK;
         end = PAGE_ALIGN(end);
-        printk("start %lx end %lx\n",start,end);
+        hyplet_info("start %lx end %lx\n",start,end);
 
-        for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE,fr += PAGE_SIZE) {
+        for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE,from += PAGE_SIZE) {
                 int err;
                 unsigned long pfn;
 
-                pfn = kvm_uaddr_to_pfn(fr);
+                pfn = kvm_uaddr_to_pfn(from);
                 if (pfn <= 0)
                         continue;
 
@@ -56,8 +41,9 @@ int create_hyp_user_mappings(void *from, void *to)
                 		hyplet_err("Failed to map %p\n",(void *)virt_addr);
                         return err;
                 }
+                nr_pages++;
         }
-        return 0;
+        return nr_pages;
 }
 
 
@@ -80,32 +66,30 @@ struct hyp_addr* hyplet_get_addr_segment(long addr,struct hyplet_vm *tv)
 	return NULL;
 }
 
-int __hyplet_map_user_data(void *umem,int size)
+int __hyplet_map_user_data(void *umem,int size,int mem_type)
 {
-	int err;
+
 	struct hyplet_vm *tv;
 	struct hyp_addr* addr;
-	unsigned long end_addr;
-	unsigned long aligned_addr;
+	int pages = 0;
 
-	aligned_addr = (unsigned long)umem & PAGE_MASK;
-	end_addr = (unsigned long)umem + size;
 	tv = hyplet_get_vm();
 
-	err = create_hyp_user_mappings(umem, umem + size);
-	if (err){
+	pages = create_hyp_user_mappings(umem, umem + size);
+	if (pages <= 0){
 			hyplet_err(" failed to map to ttbr0_el2\n");
 			return -1;
 	}
 
 	addr = kmalloc(sizeof(struct hyp_addr ), GFP_USER);
-	addr->addr = (unsigned long)umem & PAGE_MASK;
-	addr->size = PAGE_ALIGN((unsigned long)umem + size) - addr->addr;
-
+	addr->addr = (unsigned long)umem;
+	addr->size = size;
+	addr->type = mem_type;
+	addr->nr_pages = pages;
 	list_add(&addr->lst, &tv->hyp_addr_lst);
 
-	hyplet_info("pid %d user mapped real (%p size=%d) in [%lx,%lx] size=%d\n",
-			current->pid,umem ,size, addr->addr, addr->addr + addr->size ,addr->size );
+	hyplet_info("pid %d user mapped %p size=%d pages=%d\n",
+			current->pid,umem ,size, addr->nr_pages );
 
 	return 0;
 }
@@ -118,48 +102,44 @@ int hyplet_map_user_data(int __type, void *action)
 {
 	struct hyplet_map_addr *uaddr = (struct hyplet_map_addr *)action;
 	struct hyplet_vm *tv;
+	int mem_type = 0;
 	struct vm_area_struct* vma;
-	int size;
-	unsigned long umem;
+	int size = uaddr->size;
 	hyplet_ops type  = (hyplet_ops)__type;
 
 	tv = hyplet_get_vm();
 
-	size = uaddr->size;
-	umem = (unsigned long)uaddr->addr & PAGE_MASK;
-
-	printk("uaddr %lx umem %lx size %d\n",
-			umem, uaddr->addr, size);
-
-	if (hyplet_get_addr_segment(umem ,tv)) {
-		hyplet_err(" address already mapped");
+	if (hyplet_get_addr_segment(uaddr->addr ,tv)) {
+		hyplet_err(" address %lx already mapped\n",uaddr->addr);
 		return -1;
 	}
 
 	vma = current->active_mm->mmap;
 
 	for (; vma ; vma = vma->vm_next) {
-
-		printk("vma %lx .. %lx\n",vma->vm_start,vma->vm_end);
-
 		if (vma->vm_start <= uaddr->addr && vma->vm_end >= uaddr->addr){
 
 			if (vma->vm_flags & VM_EXEC
 						&& type == HYPLET_MAP_CODE){
 				tv->state |= USER_CODE_MAPPED;
+				mem_type = USER_CODE_MAPPED;
 			}
 
-			if (type == HYPLET_MAP_STACK)
+			if (type == HYPLET_MAP_STACK){
 				tv->state |= USER_STACK_MAPPED;
+				mem_type = USER_STACK_MAPPED;
+			}
 
-			if (type == HYPLET_MAP_ANY)
+			if (type == HYPLET_MAP_ANY){
 				tv->state |= USER_MEM_ANON_MAPPED;
+				mem_type = USER_MEM_ANON_MAPPED;
+			}
 
 			if (size == -1) {
-				uaddr->addr =  umem;
 				size  = PAGE_SIZE;
+				mem_type = USER_NO_SIZE;
 			}
-			return __hyplet_map_user_data((void *)uaddr->addr, size);
+			return __hyplet_map_user_data((void *)uaddr->addr, size, mem_type);
 
 		}
 	}
@@ -167,17 +147,35 @@ int hyplet_map_user_data(int __type, void *action)
 	return -1;
 }
 
-void hyplet_free_mem(void)
+void hyplet_free_mem(struct hyplet_vm *tv)
 {
-        struct hyplet_vm *tv = hyplet_get_vm();
         struct hyp_addr* tmp,*tmp2;
+        int i;
 
+	msleep(100);
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
-        		hyp_user_unmap( tmp->addr , tmp->size);
-                hyplet_call_hyp(hyplet_invld_tlb, tmp->addr);
-                list_del(&tmp->lst);
-                hyplet_info("unmap %lx\n",tmp->addr);
-                kfree(tmp);
+
+        	hyplet_info("unmap %lx, %lx size=%d pages=%d\n",
+        			tmp->addr, tmp->addr & PAGE_MASK,
+					tmp->size,  tmp->nr_pages);
+
+        	for ( i = 0 ; i < tmp->nr_pages ; i++){
+        		unsigned long addr = ( tmp->addr & PAGE_MASK )+ PAGE_SIZE * (i-1);
+        		hyplet_user_unmap( addr );
+        	}
+
+        	hyplet_call_hyp(hyplet_invld_tlb,  tmp->addr);
+    		if (tmp->type & (HYPLET_MAP_STACK | HYPLET_MAP_ANY ) ){
+    			__flush_dcache_area((void *)tmp->addr, tmp->size);
+    		}
+
+    		if (tmp->type & USER_CODE_MAPPED ){
+    				flush_icache_range(tmp->addr,
+    						tmp->addr + tmp->size);
+    		}
+
+		list_del(&tmp->lst);
+		kfree(tmp);
         }
 }
 

@@ -26,6 +26,11 @@ struct hyplet_vm* hyplet_get_vm(void)
 	return this_cpu_ptr(&TVM);
 }
 
+struct hyplet_vm* hyplet_get(int cpu)
+{
+	return &per_cpu(TVM, cpu);
+}
+
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
 {
@@ -94,7 +99,6 @@ int hyplet_init(void)
 		INIT_LIST_HEAD(&t->hyp_addr_lst);
 	}
 
-	INIT_LIST_HEAD(&tv->hyp_addr_lst);
 	hyplet_info("sizeof hyplet %zd\n",sizeof(struct hyplet_ctrl));
 	init_procfs();
 	return 0;
@@ -110,6 +114,7 @@ void hyplet_map_tvm(void)
 	err = create_hyp_mappings(tv, tv + 1);
 	if (err) {
 		hyplet_err("Failed to map hyplet vm");
+		return;
 	} else {
 		hyplet_info("Mapped hyplet vm");
 	}

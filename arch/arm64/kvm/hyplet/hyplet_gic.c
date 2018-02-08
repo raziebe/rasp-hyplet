@@ -20,6 +20,8 @@
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
+static int __hyplet_run = 0;
+
 int hyplet_trapped_irq(void)
 {
 	struct hyplet_vm *tv = hyplet_get_vm();
@@ -63,6 +65,7 @@ int hyplet_ctl(unsigned long arg)
 				break;
 		case HYPLET_TRAP_IRQ:
 				// user provides the irq, we must find hw_irq
+				__hyplet_run = 1;
 				return hyplet_trap_irq(hplt.__action.irq);
 
 		case HYPLET_UNTRAP_IRQ:
@@ -106,11 +109,10 @@ int hyplet_trap_irq(int irq)
 		return -EINVAL;
 	}
 
-	tv->task_struct = current;
+	tv->tsk = current;
 	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
 		return -EINVAL;
 	}
-	tv->state |= RUN_HYPLET;
 	tv->irq_to_trap = hwirq;
 	hyplet_info("Trapping irq %d local irq %d\n", irq,hwirq);
 	mb();
@@ -125,9 +127,14 @@ int hyplet_untrap_irq(int irq)
 
 int hyplet_run(int hwirq)
 {
-	struct hyplet_vm *tv = hyplet_get_vm();
+	struct hyplet_vm *tv;
+	
+	if (!__hyplet_run)
+		return 0;
 
-	if (tv->task_struct && hwirq == tv->irq_to_trap)
+	tv = hyplet_get_vm();
+
+	if (tv->tsk && hwirq == tv->irq_to_trap)
         	hyplet_call_hyp(hyplet_run_user);
 
 	return 0; // TODO
@@ -135,15 +142,30 @@ int hyplet_run(int hwirq)
 
 void hyplet_reset(struct task_struct *tsk)
 {
-	struct hyplet_vm *tv = hyplet_get_vm();
+	int ret;
+	int cpu;
+	struct hyplet_vm *tv;
 
-	if (tv->task_struct != tsk)
-		return;
+	for_each_online_cpu(cpu) {
+		tv =  hyplet_get(cpu);
+		if (!tv->tsk)
+			continue;
+		if (tv->tsk->mm == tsk->mm){
+			ret = smp_call_function_single(cpu, hyplet_stop, tv, 0);
+			if (ret){
+				hyplet_err("failed to stop hyplet");
+			}
+		}
+	}
+}
+
+void hyplet_stop(void *info)
+{ 
+	struct hyplet_vm *tv = (struct hyplet_vm *)info;
 
 	tv->irq_to_trap = 0;
-	mb();
-	hyplet_free_mem();
+	hyplet_free_mem(tv);
 	tv->state  = 0;
-	tv->task_struct = NULL;
-	hyplet_info("reset pid=%d\n",tsk->pid);
+	hyplet_info("stop pid = %d",tv->tsk->pid);
+	tv->tsk = NULL;
 }

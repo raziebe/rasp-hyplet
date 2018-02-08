@@ -30,6 +30,9 @@
 #include <asm/kvm_emulate.h>
 
 #include "trace.h"
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
 
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 
@@ -220,7 +223,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 			/* No need to invalidate the cache for device mappings */
 			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
 				kvm_flush_dcache_pte(old_pte);
-
+			hyplet_clear_cache(pte, sizeof(pte_t));
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -541,11 +544,10 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-void hyp_user_unmap(unsigned long umem,int size)
+void hyplet_user_unmap(unsigned long umem)
 {
-        int sz_page = PAGE_ALIGN(size);
-        unmap_range(NULL, hyp_pgd, umem, sz_page);
- }
+        unmap_range(NULL, hyp_pgd, umem, PAGE_SIZE);
+}
 
 int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
@@ -609,7 +611,7 @@ unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
 	                      1,  /* force */
 	                    (struct page **)&pages, 0);
 	if (nr <= 0){
-	       printk("TP: INSANE: failed to get user pages %p\n",(void *)uaddr);
+	       printk("hyplet: failed to get user pages %p\n",(void *)uaddr);
 	       return 0x00;
 	}
 	pfn = page_to_pfn(pages[0]);
