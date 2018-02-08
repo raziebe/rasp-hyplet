@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <linux/hyplet_user.h>
+#include "linux/hyplet_user.h"
 #include "hyplet_utils.h"
 
 
@@ -62,7 +62,7 @@ int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &some_global, -1)) {
+	if (hyplet_map(HYPLET_MAP_ANY, &some_global, 8)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
