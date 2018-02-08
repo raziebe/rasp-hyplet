@@ -32,7 +32,7 @@ long dt_zeros = 0;
 
 int* hist=NULL;
 
-int hist_size	= 50;
+int hist_size	= 200;
 #define LPJ  19200
 
 long user_hyplet(void *opaque)
