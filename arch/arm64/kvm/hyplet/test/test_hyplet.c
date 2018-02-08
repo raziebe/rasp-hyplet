@@ -1,14 +1,3 @@
-/*
-
- * test_hyplet.c
- *
- *  Created on: Jan 22, 2018
- *      Author: raz
- *
- *      This code is a comparision tool between hyplets to user space that 
- *	on a hardware timer
- */
-
 #define _GNU_SOURCE
 
 #include <pthread.h>
@@ -17,42 +6,41 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/time.h>
 
-#include "user_hyplet.h"
-#include "test_hyplet.h"
+#include <linux/hyplet_user.h>
+#include "hyplet_utils.h"
 
+
+unsigned long prev_ts = 0;
+unsigned long next_ts = 0;
 int irq = 0;
 int loops = 10000;
 int count = 0;
-long prev_tick = 0;
-long dt_max = 0;
-long dt_min = 100000;
-long dt_zeros = 0;
+int dropped = 0;
+long* hist = NULL;
+long* hist_neg = NULL;
+int hist_size	= 10000;
 
-int* hist=NULL;
+#define TICK_NS 1000000
 
-
-#define DT_HIKEY 1200
-
-long user_hyplet(void *opaque)
+long user_hyplet(void)
 {
 	int times_offset= 0;
-	long dt;
-	long curtick = cycles();
+	unsigned long dt = 0;
+	unsigned long ts = 0;
 
-	if (prev_tick != 0){
-		dt = curtick - prev_tick;		
-	}
-	prev_tick = curtick;
-	if (dt_max < dt)
-		dt_max  = dt;
-	if (dt_min >  dt)
-		dt_min = dt;
-	
-	times_offset = dt - DT_HIKEY;
-	if (times_offset < HIST_SIZE && times_offset >= 0)
-		hist[times_offset]++;
-	count++;
+	ts = cntvoffel2()/1000;
+	prev_ts = ts;
+
+/* PI3 tends to generate too many interrupts */
+	if (ts < next_ts)
+		return;
+/* stash the next iteration */
+	next_ts = ts + 1000;
+/* calc */
+	if (count < hist_size)
+		hist[count++] =  ts;
 }
 
 int take_options(int argc, char *argv[])
@@ -106,18 +94,31 @@ int hyplet_start(int hyplet_code_size)
 		return -1;
 	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &prev_tick, -1)) {
+	if (hyplet_map(HYPLET_MAP_ANY, &prev_ts, -1)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
 
-	heap_sz = sizeof(int) * HIST_SIZE;
+	heap_sz = sizeof(long) * hist_size;
 	hist = malloc(heap_sz);
 	memset(hist, 0x00, heap_sz);
 	if (hyplet_map(HYPLET_MAP_ANY, hist, heap_sz)) {
 		fprintf(stderr, "hyplet: Failed to map a heap\n");
 		return -1;
 	}
+
+	hist_neg = malloc(heap_sz);
+	memset(hist_neg, 0x00, heap_sz);
+	if (hyplet_map(HYPLET_MAP_ANY, hist_neg, heap_sz)) {
+		fprintf(stderr, "hyplet: Failed to map a heap\n");
+		return -1;
+	}
+	/*
+	if (hyplet_map(HYPLET_MAP_CODE, gettimeofday, 4096)) {
+		fprintf(stderr, "hyplet: Failed to map a heap\n");
+		return -1;
+	}
+*/
 	if (hyplet_trap_irq(irq)) {
 		printf("hyplet: Failed to map user's data\n");
 		return -1;

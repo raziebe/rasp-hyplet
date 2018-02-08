@@ -55,10 +55,11 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 
 	for_each_online_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(TVM, cpu);
-		len += sprintf(page + len, "cpu%d cnt=%d irq=%d\n", 
+		len += sprintf(page + len, "cpu%d cnt=%d"
+				" irq=%d dbg=%d\n", 
 				   cpu,
 				   tv->int_cnt,
-			       	   tv->gic_irq);
+			       	   tv->gic_irq, tv->dbg);
 	}
 
 	filp->private_data = 0x00;
@@ -99,7 +100,6 @@ int hyplet_init(void)
 		INIT_LIST_HEAD(&t->hyp_addr_lst);
 	}
 
-	hyplet_info("sizeof hyplet %zd\n",sizeof(struct hyplet_ctrl));
 	init_procfs();
 	return 0;
 }

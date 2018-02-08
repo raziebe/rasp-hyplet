@@ -110,6 +110,7 @@ struct hyplet_vm {
 
  	struct list_head hyp_addr_lst;
  	unsigned int state;
+	unsigned int dbg;
  	unsigned long initialized;
 
 } __attribute__ ((aligned (8)));

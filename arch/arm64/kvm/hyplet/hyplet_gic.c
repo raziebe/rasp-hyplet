@@ -134,9 +134,9 @@ int hyplet_run(int hwirq)
 
 	tv = hyplet_get_vm();
 
-	if (tv->tsk && hwirq == tv->irq_to_trap)
-        	hyplet_call_hyp(hyplet_run_user);
-
+	if (tv->tsk && hwirq == tv->irq_to_trap) {
+		hyplet_call_hyp(hyplet_run_user);
+	}
 	return 0; // TODO
 }
 

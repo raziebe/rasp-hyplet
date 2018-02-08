@@ -22,7 +22,7 @@
 
 
 int irq = 0;
-int some_global = 0;
+unsigned long some_global = 0;
 
 /*
  * This code is executed in an hyplet context
@@ -30,7 +30,7 @@ int some_global = 0;
  */
 __attribute__((noinline, section("hyplet"))) long user_hyplet(void *opaque)
 {
-	some_global++;
+	some_global = cntvoffel2();
 }
 
 
@@ -86,11 +86,10 @@ int main(int argc, char *argv[])
 		hyplet_ctl( HYPLET_DUMP_HWIRQ , &hyp );
                 return -1;
         }
-
         irq = atoi(argv[1]);
-	
 	hyplet_start();
-	sleep(2);
-	printf("some global %d\n",some_global);
-	
+	while(1) {
+		usleep(10000);
+		printf("%ld us\n",some_global/1000 );
+	}
 }

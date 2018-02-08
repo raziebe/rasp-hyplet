@@ -152,7 +152,6 @@ void hyplet_free_mem(struct hyplet_vm *tv)
         struct hyp_addr* tmp,*tmp2;
         int i;
 
-	msleep(100);
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
         	hyplet_info("unmap %lx, %lx size=%d pages=%d\n",

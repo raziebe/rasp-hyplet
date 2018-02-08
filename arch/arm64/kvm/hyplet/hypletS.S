@@ -207,6 +207,7 @@ ENTRY(hyplet_run_user)
 	mrs	x0, tpidr_el2
 	mrs	x1, ttbr0_el1
 	mrs	x2, sp_el0
+// 	statitics here. 
 	ldr	x1, [x0, #HYPLET_CNT]	
 	add	x1, x1, #1
 	str	x1, [x0, #HYPLET_CNT]
