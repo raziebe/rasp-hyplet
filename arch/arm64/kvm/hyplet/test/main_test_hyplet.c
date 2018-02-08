@@ -39,6 +39,6 @@ int main(int argc, char *argv[])
 
 	for (i =0 ; i < hist_size; i++) {
 		if (hist[i] != 0)
-			printf("hist[%d] = %ldns\n",i, hist[i] *52);
+			printf("hist[%d ns] = %ld samples\n",i *52, hist[i]);
 	}
 }
