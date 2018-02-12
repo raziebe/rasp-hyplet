@@ -21,13 +21,19 @@
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
-int hyplet_trapped_irq(void)
+int hyplet_imp_timer(void)
 {
-	struct hyplet_vm *tv = hyplet_get_vm();
-	unsigned long gic_irq = tv->gic_irq;
+	struct hyplet_vm *hyp = hyplet_get_vm();
 
-	tv->gic_irq = 0;
-	return (int)gic_irq;
+	hyp->irq_to_trap = IRQ_TRAP_ALL;
+
+	if (!(hyp->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
+		return -EINVAL;
+	}
+	hyp->tsk = current;
+	mb();
+	hyplet_info("Implement timer\n");
+	return 0;
 }
 
 int hyplet_ctl(unsigned long arg)
@@ -71,6 +77,9 @@ int hyplet_ctl(unsigned long arg)
 	
 	   	case HYPLET_DUMP_HWIRQ:
 				return hyplet_dump_irqs();
+		
+		case HYPLET_IMP_TIMER:
+				return hyplet_imp_timer();
 	}
 	return rc;
 }
@@ -78,9 +87,10 @@ int hyplet_ctl(unsigned long arg)
 int hyplet_dump_irqs(void)
 {
 	int i;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < 0x3FF; i++) {
 		int irq = hyplet_hwirq_to_irq(i);
-		printk("hwirq %d : irq %d\n", i, irq);
+		if (irq != 0)
+			printk("hwirq %d : irq %d\n", i, irq);
 	}
 	return 0;
 }
@@ -128,13 +138,17 @@ int hyplet_run(int hwirq)
 	struct hyplet_vm *hyp;
 	
 	hyp = hyplet_get_vm();
+	if (hyp->tsk == NULL)
+		return 0; 
 
-	if (hyp->tsk && (hwirq == hyp->irq_to_trap)) {
+	if (hwirq == hyp->irq_to_trap
+			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
+
 		struct timespec64 tv;
+
 
 		getnstimeofday64(&tv);
 		hyp->ts = tv.tv_sec * NSEC_PER_SEC + tv.tv_nsec;
-		isb();
 		hyplet_call_hyp(hyplet_run_user);
 	}
 	return 0; // TODO

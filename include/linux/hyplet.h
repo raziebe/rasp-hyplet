@@ -86,9 +86,11 @@ enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 
 #define USER_CODE_MAPPED		UL(1) << 1
 #define USER_STACK_MAPPED		UL(1) << 2
-#define USER_MEM_ANON_MAPPED	UL(1) << 3
+#define USER_MEM_ANON_MAPPED		UL(1) << 3
 #define USER_NO_SIZE			UL(1) << 4
-//#define RUN_HYPLET				UL(1) << 5
+
+#define	IRQ_TRAP_ALL			UL(0xFFFF)
+
 
 struct hyp_addr {
 	struct list_head lst;

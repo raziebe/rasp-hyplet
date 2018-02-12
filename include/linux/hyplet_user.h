@@ -8,6 +8,7 @@ typedef enum { HYPLET_MAP_CODE = 1,
 	   HYPLET_UNTRAP_IRQ = 5,
 	   HYPLET_REGISTER_BH = 6, // register the task to wake up
 	   HYPLET_DUMP_HWIRQ = 7,
+	   HYPLET_IMP_TIMER = 8,
 }hyplet_ops;
 
 
