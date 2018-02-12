@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
 			break;
 		usleep(1000);
 	}
+	gettimeofday(&tv2, NULL);
 	for (i =0 ; i < hist_size; i++) {
 		if (hist[i] != 0) {
 			printf("hist[%d us] = %lld samples\n",i, hist[i]);
@@ -54,8 +55,7 @@ int main(int argc, char *argv[])
 			tot+=hist_neg[i];
 		}
 	}
-	gettimeofday(&tv2, NULL);
 	dt_us = (tv2.tv_sec -tv1.tv_sec)*1000000 + (tv2.tv_usec - tv1.tv_usec); 
-	printf("dropped %d count=%d duration %d us\n",
+	printf("dropped %d tot=%d duration %d us\n",
 			dropped,tot, dt_us);
 }

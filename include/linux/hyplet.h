@@ -103,6 +103,8 @@ struct hyplet_vm {
 	unsigned int int_cnt;
 	unsigned int gic_irq;
 	unsigned int irq_to_trap;
+	unsigned long long ts;
+
 	unsigned long hyplet_stack;
 	unsigned long hyplet_code;
 

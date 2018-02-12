@@ -131,7 +131,7 @@ __hyplet_panic:
 	.quad	PAGE_OFFSET
 ENDPROC(__hyplet_panic)
 __hyp_panic_str:
-	.ascii	"Truly panic:\nCode:%08x PC:%016x ESR:%08x\nFAR:%016x" \
+	.ascii	"hyplet panic:\nCode:%08x PC:%016x ESR:%08x\nFAR:%016x" \
 	" HPFAR:%016x RAZDBG:%p\nTrulyCxt:%p\n\0"
 
 ENTRY(hyplet_get_tcr_el1)
@@ -199,7 +199,7 @@ ENDPROC(hyplet_call_hyp)
 ENTRY(hyplet_run_user)
 
 /*
- *	User had set an hyplet
+ * User had set an hyplet
  *  prepare to jump to hyplet
 */
 	push_registers
@@ -207,7 +207,7 @@ ENTRY(hyplet_run_user)
 	mrs	x0, tpidr_el2
 	mrs	x1, ttbr0_el1
 	mrs	x2, sp_el0
-// 	statitics here. 
+// 	statitics here.
 	ldr	x1, [x0, #HYPLET_CNT]	
 	add	x1, x1, #1
 	str	x1, [x0, #HYPLET_CNT]
@@ -216,19 +216,23 @@ ENTRY(hyplet_run_user)
 	msr	sp_el0,x1
 	ldr	x30,[x0, HYPLET_CODE]
 
+/* pop the time stamp */
+	ldr	x2, [x0, HYPLET_TIMESTAMP]
+	msr 	cntvoff_el2,x2
 /*  EL2t. Switch stacks */
-	mrs  x1, spsel
-	and  w1,w1,#0xFFFFFFFE
-	msr  spsel,x1
+	mrs 	 x1, spsel
+	and 	 w1,w1,#0xFFFFFFFE
+	msr  	spsel,x1
 
-	blr x30 // Execute hyplet in EL2
+	blr 	x30 // Execute hyplet in EL2
 /*
  * switch stacks back
 */
-    	mrs x1, spsel
-    	orr w1, w1, #0x1
-    	msr spsel,x1
+    	mrs 	x1, spsel
+    	orr 	w1, w1, #0x1
+    	msr 	spsel,x1
 
+	msr 	cntvoff_el2,xzr
 	pop_registers
 
 	ret

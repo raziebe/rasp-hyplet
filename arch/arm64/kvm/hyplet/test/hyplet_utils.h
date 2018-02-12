@@ -2,6 +2,7 @@
 #define __HYPLET_UTILS_H__
 
 typedef unsigned long long u64;
+typedef signed long long s64;
 static const int arm_arch_timer_reread = 1;
 
 #define cycles_to_nano(val) (val * 52)

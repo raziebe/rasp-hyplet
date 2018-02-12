@@ -12,35 +12,58 @@
 #include "hyplet_utils.h"
 
 
-unsigned long prev_ts = 0;
-unsigned long next_ts = 0;
+unsigned long long prev_ts = 0;
+unsigned long long next_ts = 0;
 int irq = 0;
 int loops = 10000;
 int count = 0;
+int _count = 0;
 int dropped = 0;
 long* hist = NULL;
 long* hist_neg = NULL;
 int hist_size	= 10000;
 
-#define TICK_NS 1000000
+#define abs(x) ((x)<0 ? -(x) : (x))
+#define TICK_US 1000LL
+#define TICK_NS 999000LL // tick might be early
 
+/*
+ * Implemented as timer0 hyplet
+*/
 long user_hyplet(void)
 {
-	int times_offset= 0;
-	unsigned long dt = 0;
-	unsigned long ts = 0;
+	long long times_offset= 0;
+	s64 dt = 0;
+	s64 ts = 0;
 
-	ts = cntvoffel2()/1000;
-	prev_ts = ts;
+	ts = cntvoffel2();
+	if (ts < next_ts){
+		return 0;
+	}
+	if (prev_ts != 0) {
+		dt = ts - prev_ts;
+		prev_ts = ts;
+		next_ts = ts + TICK_NS;
+	} else{
+		prev_ts = ts;
+		next_ts = ts + TICK_NS;
+		return 0;
+	}
+/* calc histogram  */
+	times_offset = (dt - TICK_NS)/1000;
+	times_offset = abs(times_offset);
+	//if (times_offset > 5) // -5us error is possible
+		/* align to the timer tick */
+	//	next_ts = ts + TICK_NS + times_offset*1000;
 
-/* PI3 tends to generate too many interrupts */
-	if (ts < next_ts)
-		return;
-/* stash the next iteration */
-	next_ts = ts + 1000;
-/* calc */
-	if (count < hist_size)
-		hist[count++] =  ts;
+	if (times_offset < hist_size && times_offset >= 0) {
+		hist[times_offset]++;
+	} else{
+		dropped++;
+	}
+hyplet_out:
+	count++;
+	return 0;
 }
 
 int take_options(int argc, char *argv[])

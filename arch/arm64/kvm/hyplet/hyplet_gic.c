@@ -17,10 +17,9 @@
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
 
+#include <linux/delay.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
-
-static int __hyplet_run = 0;
 
 int hyplet_trapped_irq(void)
 {
@@ -65,7 +64,6 @@ int hyplet_ctl(unsigned long arg)
 				break;
 		case HYPLET_TRAP_IRQ:
 				// user provides the irq, we must find hw_irq
-				__hyplet_run = 1;
 				return hyplet_trap_irq(hplt.__action.irq);
 
 		case HYPLET_UNTRAP_IRQ:
@@ -127,14 +125,16 @@ int hyplet_untrap_irq(int irq)
 
 int hyplet_run(int hwirq)
 {
-	struct hyplet_vm *tv;
+	struct hyplet_vm *hyp;
 	
-	if (!__hyplet_run)
-		return 0;
+	hyp = hyplet_get_vm();
 
-	tv = hyplet_get_vm();
+	if (hyp->tsk && (hwirq == hyp->irq_to_trap)) {
+		struct timespec64 tv;
 
-	if (tv->tsk && hwirq == tv->irq_to_trap) {
+		getnstimeofday64(&tv);
+		hyp->ts = tv.tv_sec * NSEC_PER_SEC + tv.tv_nsec;
+		isb();
 		hyplet_call_hyp(hyplet_run_user);
 	}
 	return 0; // TODO
@@ -142,7 +142,6 @@ int hyplet_run(int hwirq)
 
 void hyplet_reset(struct task_struct *tsk)
 {
-	int ret;
 	int cpu;
 	struct hyplet_vm *tv;
 
@@ -151,21 +150,19 @@ void hyplet_reset(struct task_struct *tsk)
 		if (!tv->tsk)
 			continue;
 		if (tv->tsk->mm == tsk->mm){
-			ret = smp_call_function_single(cpu, hyplet_stop, tv, 0);
-			if (ret){
-				hyplet_err("failed to stop hyplet");
-			}
+			hyplet_stop(tv);
 		}
 	}
 }
 
 void hyplet_stop(void *info)
-{ 
+{
 	struct hyplet_vm *tv = (struct hyplet_vm *)info;
 
+	tv->tsk = NULL;
 	tv->irq_to_trap = 0;
+	mb();
+	msleep(10);
 	hyplet_free_mem(tv);
 	tv->state  = 0;
-	hyplet_info("stop pid = %d",tv->tsk->pid);
-	tv->tsk = NULL;
 }
