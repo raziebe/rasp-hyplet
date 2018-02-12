@@ -25,7 +25,7 @@ int hist_size	= 10000;
 
 #define abs(x) ((x)<0 ? -(x) : (x))
 #define TICK_US 1000LL
-#define TICK_NS 999000LL // tick might be early
+#define TICK_NS 998000LL // tick might be early
 
 /*
  * Implemented as timer0 hyplet
@@ -51,18 +51,23 @@ long user_hyplet(void)
 	}
 /* calc histogram  */
 	times_offset = (dt - TICK_NS)/1000;
-	times_offset = abs(times_offset);
-	//if (times_offset > 5) // -5us error is possible
-		/* align to the timer tick */
-	//	next_ts = ts + TICK_NS + times_offset*1000;
-
-	if (times_offset < hist_size && times_offset >= 0) {
-		hist[times_offset]++;
+	if (times_offset >= 0){
+		if (times_offset < hist_size )
+			hist[times_offset]++;
+		else 
+			dropped++;
+		goto hyplet_out;
 	} else{
-		dropped++;
+		times_offset=abs(times_offset);
+		if (times_offset < hist_size)
+			hist_neg[times_offset]++;
+		else 
+			dropped++;
 	}
 hyplet_out:
 	count++;
+	if (times_offset <= 1)
+		next_ts = ts + TICK_NS;
 	return 0;
 }
 

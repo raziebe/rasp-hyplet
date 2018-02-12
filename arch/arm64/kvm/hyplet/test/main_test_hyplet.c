@@ -36,20 +36,22 @@ int main(int argc, char *argv[])
 
 	hyplet_start(HYPLET_SIZE);
 	gettimeofday(&tv1, NULL);
-
+	i = 0;
 	while (1) {
+		i++;
 		if (count >= loops)
 			break;
-		usleep(1000);
+		sleep(1);
+		printf("%d\n",i);
 	}
 	gettimeofday(&tv2, NULL);
-	for (i =0 ; i < hist_size; i++) {
+	for (i = 0 ; i < hist_size; i++) {
 		if (hist[i] != 0) {
 			printf("hist[%d us] = %lld samples\n",i, hist[i]);
 			tot+= hist[i];
 		}
 	}
-	for (i =0 ; i < hist_size; i++) {
+	for (i = 0 ; i < hist_size; i++) {
 		if (hist_neg[i] != 0){
 			printf("hist_neg[%d us] = %lld samples\n",i , hist_neg[i]);
 			tot+=hist_neg[i];
