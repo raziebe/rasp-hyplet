@@ -12,8 +12,8 @@
 #include "hyplet_utils.h"
 
 
-unsigned long long prev_ts = 0;
-unsigned long long next_ts = 0;
+u64 prev_ts = 0;
+u64 next_ts = 0;
 int irq = 0;
 int loops = 10000;
 int count = 0;
@@ -40,19 +40,18 @@ long user_hyplet(void)
 	if (ts < next_ts){
 		return 0;
 	}
+	next_ts = ts + TICK_NS;
 	if (prev_ts != 0) {
 		dt = ts - prev_ts;
 		prev_ts = ts;
-		next_ts = ts + TICK_NS;
 	} else{
 		prev_ts = ts;
-		next_ts = ts + TICK_NS;
 		return 0;
 	}
 /* calc histogram  */
 	times_offset = (dt - TICK_NS)/1000;
 	if (times_offset >= 0){
-		if (times_offset < hist_size )
+		if (times_offset < hist_size)
 			hist[times_offset]++;
 		else 
 			dropped++;
@@ -75,13 +74,16 @@ int take_options(int argc, char *argv[])
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "l:i:")) != -1) {
+	while ((opt = getopt(argc, argv, "l:i:a")) != -1) {
 		switch (opt) {
 		case 'i':
 			irq = atoi(optarg);
 			break;
 		case 'l':
 			loops = atoi(optarg);
+			break;
+		case 'a':
+			irq =  HYPLET_IMP_TIMER;
 			break;
 		default:	/* '?' */
 			fprintf(stderr,
@@ -141,16 +143,18 @@ int hyplet_start(int hyplet_code_size)
 		fprintf(stderr, "hyplet: Failed to map a heap\n");
 		return -1;
 	}
-	/*
-	if (hyplet_map(HYPLET_MAP_CODE, gettimeofday, 4096)) {
-		fprintf(stderr, "hyplet: Failed to map a heap\n");
-		return -1;
-	}
-*/
-	if (hyplet_trap_irq(irq)) {
-		printf("hyplet: Failed to map user's data\n");
-		return -1;
+	if (irq  ==  HYPLET_IMP_TIMER) {
+		if (hyplet_trap_all_irqs()) {
+			printf("hyplet: Failed to map user's data\n");
+			return -1;
+		}
+		return 0;
 	}
 
+	if (hyplet_trap_irq(irq)) {
+		printf("hyplet: Failed to trap irq %d\n",irq);
+		return -1;
+	}
+	return 0;
 }
 

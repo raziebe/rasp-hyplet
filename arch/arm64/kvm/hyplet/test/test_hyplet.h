@@ -1,1 +1,1 @@
-#define HYPLET_SIZE 556
+#define HYPLET_SIZE 528

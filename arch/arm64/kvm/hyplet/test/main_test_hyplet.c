@@ -44,17 +44,18 @@ int main(int argc, char *argv[])
 		sleep(1);
 		printf("%d\n",i);
 	}
+
 	gettimeofday(&tv2, NULL);
 	for (i = 0 ; i < hist_size; i++) {
 		if (hist[i] != 0) {
 			printf("hist[%d us] = %lld samples\n",i, hist[i]);
-			tot+= hist[i];
+			tot += hist[i];
 		}
 	}
 	for (i = 0 ; i < hist_size; i++) {
 		if (hist_neg[i] != 0){
 			printf("hist_neg[%d us] = %lld samples\n",i , hist_neg[i]);
-			tot+=hist_neg[i];
+			tot += hist_neg[i];
 		}
 	}
 	dt_us = (tv2.tv_sec -tv1.tv_sec)*1000000 + (tv2.tv_usec - tv1.tv_usec); 

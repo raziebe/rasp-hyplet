@@ -48,6 +48,20 @@ int hyplet_test(int cmd)
 
 }
 
+int hyplet_trap_all_irqs(int irq)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	hplt.__action.irq = 0xFFFF;
+	rc = hyplet_ctl( HYPLET_IMP_TIMER , &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed assign irq\n");
+		return -1;
+	}
+	return 0;
+}
+
 int hyplet_trap_irq(int irq)
 {
 	int rc;

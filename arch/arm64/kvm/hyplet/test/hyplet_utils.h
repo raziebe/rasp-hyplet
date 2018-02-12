@@ -35,6 +35,12 @@ static inline long cycles(void) {
 	return cval;
 }
 
+static inline u64 cycles_to_ns()
+{
+	u64 t = cycles();
+	return t * 52;
+}
+
 static inline long cntvoffel2(void)
 {
 	long val;
