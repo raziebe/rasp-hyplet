@@ -17,20 +17,20 @@
 #include <errno.h>
 #include <string.h>
 
-#include "linux/hyplet_user.h"
+#include <linux/hyplet_user.h>
 #include "hyplet_utils.h"
 
 
 int irq = 0;
-unsigned long some_global = 0;
+int some_global = 0;
 
 /*
  * This code is executed in an hyplet context
  * The attribute is only used to caluclated the exact size of the function.
  */
-__attribute__((noinline, section("hyplet"))) long user_hyplet(void *opaque)
+long user_hyplet(void *opaque)
 {
-	some_global = cntvoffel2();
+	some_global++;
 }
 
 
@@ -42,7 +42,7 @@ int hyplet_start(void)
 	int heap_sz;
 	int func_size = 4 * 4;
 
-	if (hyplet_map(HYPLET_MAP_CODE, user_hyplet, func_size)) {
+	if (hyplet_map(HYPLET_MAP_HYPLET, user_hyplet, func_size)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
@@ -62,7 +62,7 @@ int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &some_global, 8)) {
+	if (hyplet_map(HYPLET_MAP_ANY, &some_global, -1)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
@@ -86,10 +86,11 @@ int main(int argc, char *argv[])
 		hyplet_ctl( HYPLET_DUMP_HWIRQ , &hyp );
                 return -1;
         }
+
         irq = atoi(argv[1]);
+	
 	hyplet_start();
-	while(1) {
-		usleep(10000);
-		printf("%ld us\n",some_global/1000 );
-	}
+	sleep(2);
+	printf("some global %d\n",some_global);
+	
 }

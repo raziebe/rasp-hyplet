@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
  
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -15,6 +14,20 @@ int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt)
 {
 	hplt->cmd = cmd;
 	return syscall(SYSCALL_HYPLET,hplt);
+}
+
+int hyplet_set_smp(void)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+	struct hyplet_smp *smp = &hplt.__action.smp;
+
+	rc  = hyplet_ctl(HYPLET_SET_SMP, &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed to set MP\n");
+		return -1;
+	}
+	return smp->nr_cpus;
 }
 
 int hyplet_map(int cmd, void *addr,int size)
@@ -44,8 +57,6 @@ int hyplet_test(int cmd)
 		return -1;
 	}
 	return 0;
-
-
 }
 
 int hyplet_trap_all_irqs(int irq)
@@ -84,6 +95,26 @@ int hyplet_untrap_irq(int irq)
 	hplt.__action.irq = irq;
 	rc = hyplet_ctl( HYPLET_UNTRAP_IRQ , &hplt);
 	if (rc < 0){
+		printf("hyplet: Failed assign irq\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*
+ * associate a function with an id
+ */
+int hyplet_rpc_set(void *user_hyplet,int func_id)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	hplt.__action.rpc_set_func.func_addr = (long)user_hyplet;
+	hplt.__action.rpc_set_func.func_id = func_id;
+
+
+	rc = hyplet_ctl(HYPLET_SET_FUNC, &hplt);
+	if (rc < 0 ){
 		printf("hyplet: Failed assign irq\n");
 		return -1;
 	}

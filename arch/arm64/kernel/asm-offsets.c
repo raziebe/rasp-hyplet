@@ -168,10 +168,10 @@ int main(void)
 
   DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
   DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
-  DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  hyplet_code));
+  DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  user_hyplet_code ));
   DEFINE(HYPLET_GIC_IRQ, offsetof(struct hyplet_vm, gic_irq));
   DEFINE(HYPLET_CNT, offsetof(struct hyplet_vm, int_cnt));
   DEFINE(HYPLET_TIMESTAMP, offsetof(struct hyplet_vm, ts));
- 
+  DEFINE(HYPLET_TTBR0_EL2, offsetof(struct hyplet_vm, ttbr0_el2));
   return 0;
 }

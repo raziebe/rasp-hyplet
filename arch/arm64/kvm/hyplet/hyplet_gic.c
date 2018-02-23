@@ -36,53 +36,6 @@ int hyplet_imp_timer(void)
 	return 0;
 }
 
-int hyplet_ctl(unsigned long arg)
-{
-	struct hyplet_vm *tvm = hyplet_get_vm();
-	struct hyplet_ctrl hplt;
-
-	int rc = -1;
-
-	if ( copy_from_user(&hplt, (void *) arg, sizeof(hplt)) ){
-		hyplet_err(" failed to copy from user");
-		return -1;
-	}
-
-	switch (hplt.cmd)
-	{
-		case HYPLET_MAP_ANY:
-				return hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-
-		case HYPLET_MAP_STACK:
-				rc = hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-				if ( rc )
-					return -EINVAL;
-				tvm->hyplet_stack = 
-					(long)(hplt.__action.addr.addr) + 
-						hplt.__action.addr.size - PAGE_SIZE;
-				break;
-
-		case HYPLET_MAP_CODE:
-				rc = hyplet_map_user_data(hplt.cmd , (void *)&hplt.__action);
-				if ( rc )
-					return -EINVAL;
-				tvm->hyplet_code = hplt.__action.addr.addr;
-				break;
-		case HYPLET_TRAP_IRQ:
-				// user provides the irq, we must find hw_irq
-				return hyplet_trap_irq(hplt.__action.irq);
-
-		case HYPLET_UNTRAP_IRQ:
-				return hyplet_untrap_irq(hplt.__action.irq);
-	
-	   	case HYPLET_DUMP_HWIRQ:
-				return hyplet_dump_irqs();
-		
-		case HYPLET_IMP_TIMER:
-				return hyplet_imp_timer();
-	}
-	return rc;
-}
 
 int hyplet_dump_irqs(void)
 {
@@ -154,29 +107,3 @@ int hyplet_run(int hwirq)
 	return 0; // TODO
 }
 
-void hyplet_reset(struct task_struct *tsk)
-{
-	int cpu;
-	struct hyplet_vm *tv;
-
-	for_each_online_cpu(cpu) {
-		tv =  hyplet_get(cpu);
-		if (!tv->tsk)
-			continue;
-		if (tv->tsk->mm == tsk->mm){
-			hyplet_stop(tv);
-		}
-	}
-}
-
-void hyplet_stop(void *info)
-{
-	struct hyplet_vm *tv = (struct hyplet_vm *)info;
-
-	tv->tsk = NULL;
-	tv->irq_to_trap = 0;
-	mb();
-	msleep(10);
-	hyplet_free_mem(tv);
-	tv->state  = 0;
-}

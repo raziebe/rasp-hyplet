@@ -120,7 +120,7 @@ int hyplet_map_user_data(int __type, void *action)
 		if (vma->vm_start <= uaddr->addr && vma->vm_end >= uaddr->addr){
 
 			if (vma->vm_flags & VM_EXEC
-						&& type == HYPLET_MAP_CODE){
+						&& type == HYPLET_MAP_HYPLET){
 				tv->state |= USER_CODE_MAPPED;
 				mem_type = USER_CODE_MAPPED;
 			}

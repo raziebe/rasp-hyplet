@@ -71,6 +71,8 @@ EL1_sync:
 	mrs	x1, esr_el2
 	lsr	x2, x1, #ESR_ELx_EC_SHIFT	// Syndrom register shift by 26 bits
 
+	cmp x2, #ESR_ELx_EC_BRK64	// user space performed watchpoint
+	b.eq 4f
 	cmp	x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
 	b.ne 	3f
 
@@ -97,6 +99,13 @@ EL1_sync:
 	pop	lr, xzr
 	eret
 
+4:	// HYP RPC
+	pop x2,x3
+	pop x0,x1
+	push x30,xzr
+	bl  hyplet_rpc
+	pop x30,xzr
+	eret
 3:
 	pop x2,x3
 	pop x0,x1
@@ -175,6 +184,37 @@ ENTRY(hyplet_clear_cache)
         ret
 ENDPROC(hyplet_clear_cache)
 
+// x0 = hyplet_id
+ENTRY(hyplet_rpc)
+	push_registers
+
+	mrs		x0,elr_el2
+	add		x0,x0,#4
+	msr		elr_el2,x0
+
+	mrs	x1, tpidr_el2
+	bl get_hyplet_addr
+	cmp	x0,xzr
+	beq 2f
+
+// prepare stack and code
+	mrs	x1, tpidr_el2
+	ldr	x2, [x1, HYPLET_STACK]
+	msr	sp_el0,x2
+	ldr	x30,[x1, HYPLET_CODE]
+
+	mrs 	x1, spsel
+	and 	w1,w1,#0xFFFFFFFE
+	msr  	spsel,x1
+	blr 	x30
+	mrs 	x1, spsel
+	orr 	w1, w1, #0x1
+	msr 	spsel,x1
+
+2:
+	pop_registers
+	ret
+ENDPROC(hyplet_rpc)
 /*
 * This procedure calls the default hypervisor vector and
 * and sets truly vector. This is because when the cpu drops
@@ -187,11 +227,36 @@ ENTRY(hyplet_set_vectors)
 	ret
 ENDPROC(hyplet_set_vectors)
 
+/*
+ * put all tables to the processor's 0
+*/
+ENTRY(hyplet_set_cxt)
+	kern_hyp_va  x0
+	msr tpidr_el2, x0
+	msr	ttbr0_el2, x1
+	ret
+ENDPROC(hyplet_set_cxt)
 
 ENTRY(hyplet_call_hyp)
-        hvc	#0
-        ret
+	hvc	#0
+	ret
 ENDPROC(hyplet_call_hyp)
+
+/*
+ * turn on brk trap
+*/
+ENTRY(hyplet_brk_on)
+	mov	x0,#0x100
+	msr mdcr_el2,x0
+	ret
+ENDPROC(hyplet_brk_on)
+/*
+ * turn off brk trap
+*/
+ENTRY(hyplet_brk_off)
+	msr mdcr_el2,xzr
+	ret
+ENDPROC(hyplet_brk_off)
 
 /*
  *	Executing user code
@@ -205,8 +270,6 @@ ENTRY(hyplet_run_user)
 	push_registers
 
 	mrs	x0, tpidr_el2
-	mrs	x1, ttbr0_el1
-	mrs	x2, sp_el0
 // 	statitics here.
 	ldr	x1, [x0, #HYPLET_CNT]	
 	add	x1, x1, #1
@@ -228,9 +291,9 @@ ENTRY(hyplet_run_user)
 /*
  * switch stacks back
 */
-    	mrs 	x1, spsel
-    	orr 	w1, w1, #0x1
-    	msr 	spsel,x1
+	mrs 	x1, spsel
+	orr 	w1, w1, #0x1
+	msr 	spsel,x1
 
 	msr 	cntvoff_el2,xzr
 	pop_registers
@@ -250,10 +313,18 @@ ENTRY(hyplet_on)
 
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
+
+
+	mrs	x1,ttbr0_el2
+	str	x1, [x0, #HYPLET_TTBR0_EL2]
+
 // enable MMU
-	mov	x0, #1
+	mov		x0, #1
 	lsl     x0, x0, #HCR_RW_SHIFT
-	msr	hcr_el2, x0
+	msr		hcr_el2, x0
+
+	mov		x0, #0x100
+	msr 	mdcr_el2, x0
 
 	pop 	x2,x3
 	pop 	x0,x1
@@ -263,7 +334,7 @@ ENDPROC(hyplet_on)
 
 .align 11
 ENTRY(__hyplet_vectors)
-        invalid_vector	EL2_sync,#1                        //Current EL with SP0
+		invalid_vector	EL2_sync,#1                        //Current EL with SP0
         invalid_vector  EL2_irq_invalid,#2                 // IRQ EL2t
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t

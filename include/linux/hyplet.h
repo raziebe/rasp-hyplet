@@ -86,8 +86,9 @@ enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 
 #define USER_CODE_MAPPED		UL(1) << 1
 #define USER_STACK_MAPPED		UL(1) << 2
-#define USER_MEM_ANON_MAPPED		UL(1) << 3
+#define USER_MEM_ANON_MAPPED	UL(1) << 3
 #define USER_NO_SIZE			UL(1) << 4
+#define USER_SMP				UL(1) << 5
 
 #define	IRQ_TRAP_ALL			UL(0xFFFF)
 
@@ -108,15 +109,15 @@ struct hyplet_vm {
 	unsigned long long ts;
 
 	unsigned long hyplet_stack;
-	unsigned long hyplet_code;
-
+	unsigned long user_hyplet_code;
+	int		hyplet_id;
 	struct task_struct *tsk;
 
  	struct list_head hyp_addr_lst;
  	unsigned int state;
 	unsigned int dbg;
  	unsigned long initialized;
-
+ 	unsigned long ttbr0_el2;
 } __attribute__ ((aligned (8)));
 
 extern char __hyplet_vectors[];
@@ -142,13 +143,16 @@ int  		hyplet_ctl(unsigned long arg);
 int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(void);
 int  		hyplet_run_user(void);
-int		hyplet_dump_irqs(void);
+int			hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
 unsigned long   hyplet_clear_cache(pte_t* addr,long size);
-int 		create_hyp_mappings(void *, void *);
+int 			create_hyp_mappings(void *, void *);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
+unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
+void 			hyplet_set_cxt(long addr);
+int 			hyplet_imp_timer(void);
 
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,

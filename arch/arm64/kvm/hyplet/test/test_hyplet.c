@@ -36,7 +36,7 @@ long user_hyplet(void)
 	s64 dt = 0;
 	s64 ts = 0;
 
-	ts = cntvoffel2();
+	ts = cntvoff_el2();
 	if (ts < next_ts){
 		return 0;
 	}
@@ -104,7 +104,7 @@ int hyplet_start(int hyplet_code_size)
 	void *stack_addr;
 	int heap_sz;
 
-	if (hyplet_map(HYPLET_MAP_CODE, user_hyplet, hyplet_code_size)) {
+	if (hyplet_map(HYPLET_MAP_HYPLET, user_hyplet, hyplet_code_size)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
