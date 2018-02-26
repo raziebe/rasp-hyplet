@@ -183,7 +183,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
 	} else if (stat) {
 		u32 hwirq = ffs(stat) - 1;
 #ifdef __HYPLET__
-		hyplet_run(hwirq);
+		if (hwirq) hyplet_run(hwirq);
 #endif
 		handle_domain_irq(intc.domain, hwirq, regs);
 	}
