@@ -174,7 +174,6 @@ int main(void)
   DEFINE(HYPLET_TIMESTAMP, offsetof(struct hyplet_vm, ts));
   DEFINE(HYPLET_ELR_EL2, offsetof(struct hyplet_vm, elr_el2));
   DEFINE(HYPLET_SP_EL0, offsetof(struct hyplet_vm, sp_el0));
-  DEFINE(HYPLET_LR, offsetof(struct hyplet_vm, lr));
   DEFINE(HYPLET_VAL, offsetof(struct hyplet_vm, user_val));
   DEFINE(HYPLET_USER_HYPLET_ID, offsetof(struct hyplet_vm, user_hyplet_id));
   return 0;
