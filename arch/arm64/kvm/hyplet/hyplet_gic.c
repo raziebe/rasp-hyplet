@@ -51,7 +51,8 @@ int hyplet_dump_irqs(void)
 int hyplet_search_irq(int lirq)
 {
 	int i;
-	for (i = 0; i < NR_IRQS; i++) {
+
+	for (i = 0; i < 0x3FF; i++) {
 		int irq = hyplet_hwirq_to_irq(i);
 		if (irq == lirq)
 			return i;

@@ -16,20 +16,6 @@ int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt)
 	return syscall(SYSCALL_HYPLET,hplt);
 }
 
-int hyplet_set_smp(void)
-{
-	int rc;
-	struct hyplet_ctrl hplt;
-	struct hyplet_smp *smp = &hplt.__action.smp;
-
-	rc  = hyplet_ctl(HYPLET_SET_SMP, &hplt);
-	if (rc < 0){
-		printf("hyplet: Failed to set MP\n");
-		return -1;
-	}
-	return smp->nr_cpus;
-}
-
 int hyplet_map(int cmd, void *addr,int size)
 {
 	int rc;

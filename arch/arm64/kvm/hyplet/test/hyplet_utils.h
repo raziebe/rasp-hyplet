@@ -41,17 +41,25 @@ static inline u64 cycles_to_ns()
 	return t * 52;
 }
 
-static inline long cntvoffel2(void)
+static inline long cntvoff_el2(void)
 {
 	long val;
 	asm ("mrs   %0, cntvoff_el2" : "=r" (val) );
 	return val;
 }
 
+static inline void set_cntvoff_el2(long val)
+{
+	asm ("msr  cntvoff_el2, %0" : "=r" (val) );
+}
+
 int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt);
 int hyplet_trap_irq(int irq);
 int hyplet_map(int cmd, void *addr,int size);
 int hyplet_untrap_irq(int irq);
+int hyplet_rpc_set(void *user_hyplet,int func_id);
+long hyplet_rpc_call(int func_id,...);
+int hyplet_set_smp(void);
 
 #endif
 

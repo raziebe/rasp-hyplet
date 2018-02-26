@@ -88,10 +88,9 @@ enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 #define USER_STACK_MAPPED		UL(1) << 2
 #define USER_MEM_ANON_MAPPED	UL(1) << 3
 #define USER_NO_SIZE			UL(1) << 4
-#define USER_SMP				UL(1) << 5
+
 
 #define	IRQ_TRAP_ALL			UL(0xFFFF)
-
 
 struct hyp_addr {
 	struct list_head lst;
@@ -103,21 +102,24 @@ struct hyp_addr {
 };
 
 struct hyplet_vm {
-	unsigned int int_cnt;
-	unsigned int gic_irq;
-	unsigned int irq_to_trap;
-	unsigned long long ts;
-
+	unsigned int int_cnt __attribute__ ((packed));
+	unsigned int gic_irq __attribute__ ((packed));
+	unsigned int irq_to_trap __attribute__ ((packed));
+	unsigned long ts;
+	unsigned long elr_el2;
+	unsigned long sp_el0;
+	unsigned long user_val;
+	unsigned long user_hyplet_id; // used to pass parameters between cores
 	unsigned long hyplet_stack;
 	unsigned long user_hyplet_code;
-	int		hyplet_id;
+	int		hyplet_id __attribute__ ((packed));//  the hyplet of this core
+
 	struct task_struct *tsk;
 
  	struct list_head hyp_addr_lst;
- 	unsigned int state;
-	unsigned int dbg;
- 	unsigned long initialized;
- 	unsigned long ttbr0_el2;
+ 	unsigned int state __attribute__ ((packed));
+	unsigned int dbg __attribute__ ((packed));
+
 } __attribute__ ((aligned (8)));
 
 extern char __hyplet_vectors[];
@@ -149,11 +151,13 @@ void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
 unsigned long   hyplet_clear_cache(pte_t* addr,long size);
 int 			create_hyp_mappings(void *, void *);
+unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
-unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 void 			hyplet_set_cxt(long addr);
 int 			hyplet_imp_timer(void);
+void 			hyplet_complete_smp_rpc(void);
 
+unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot);

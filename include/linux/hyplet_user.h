@@ -10,7 +10,6 @@ typedef enum { HYPLET_MAP_HYPLET = 1,
 	   HYPLET_DUMP_HWIRQ = 7,
 	   HYPLET_IMP_TIMER = 8,
 	   HYPLET_SET_FUNC  = 9,
-	   HYPLET_SET_SMP = 10
 }hyplet_ops;
 
 
@@ -29,15 +28,15 @@ struct hyplet_rpc_set {
 	int func_id __attribute__ ((packed));
 };
 
-struct hyplet_smp {
-	int nr_cpus; // returns number of processors that the hyplet were set-on
+struct hyplet_smp_rpc {
+	int hyplet_id;
+	long val;
 };
 
 struct hyplet_ctrl {
 	int cmd  __attribute__ ((packed));
 	union  {
 		struct hyplet_map_addr 	addr ;
-		struct hyplet_smp		smp;
 		struct hyplet_rpc_set 	rpc_set_func;
 		int irq;
 	}__action  __attribute__ ((packed));

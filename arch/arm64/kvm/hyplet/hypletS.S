@@ -88,6 +88,7 @@ EL1_sync:
 1:	push	lr, xzr	
 	/*
 	 * Compute the function address in EL2, and shuffle the parameters.
+	 * The only registers pushed are lr,xzr
 	 */
 	kern_hyp_va	x0
 	mov	lr, x0		// function address
@@ -99,13 +100,10 @@ EL1_sync:
 	pop	lr, xzr
 	eret
 
-4:	// HYP RPC
+4:
 	pop x2,x3
 	pop x0,x1
-	push x30,xzr
-	bl  hyplet_rpc
-	pop x30,xzr
-	eret
+	b  hyplet_rpc
 3:
 	pop x2,x3
 	pop x0,x1
@@ -150,7 +148,7 @@ ENDPROC(hyplet_get_tcr_el1)
 
 ENTRY(hyplet_invld_tlb)
 	tlbi vae2, x0
-        tlbi vale2, x0
+    tlbi vale2, x0
 	ret
 ENDPROC(hyplet_invld_tlb)
 
@@ -184,37 +182,160 @@ ENTRY(hyplet_clear_cache)
         ret
 ENDPROC(hyplet_clear_cache)
 
+/*
+ *	User issued an rpc from a nother core. This core has the
+ *   the hyplet mapped. Call it.
+ *  Code Initiated by an HVC and returns to the intiater
+ * x0 = input parameter
+*/
+ENTRY(hyplet_smp_rpc)
+
+	push_registers
+
+	msr cntvoff_el2,x0
+	mrs	x0, tpidr_el2
+	ldr	x2, [x0, #HYPLET_STACK]
+	msr	sp_el0,x2
+	ldr	x2, [x0, #HYPLET_CODE]
+
+	mrs x1, spsel
+	and w1,w1,#0xFFFFFFFE // sp = spel0
+	msr spsel,x1
+
+// pass stack parameter
+	mrs x0, cntvoff_el2 // user_hyplet(val)
+	msr cntvoff_el2, xzr
+// call the hyplet
+	blr x2
+	msr	cntvoff_el2,x0
+// reset stack back
+	mrs x1, spsel
+	orr w1, w1, #0x1
+	msr spsel,x1
+
+	pop_registers
+
+	mrs	x0,cntvoff_el2
+	msr	cntvoff_el2,xzr
+
+	ret
+ENDPROC(hyplet_smp_rpc)
+
+// Called by a brk trap
+// x1 parameter
 // x0 = hyplet_id
 ENTRY(hyplet_rpc)
 	push_registers
 
-	mrs		x0,elr_el2
-	add		x0,x0,#4
-	msr		elr_el2,x0
+	mrs	x2, tpidr_el2
+	str x0,[x2, #HYPLET_USER_HYPLET_ID]
+	str	x1,[x2, #HYPLET_VAL]
 
+	mrs x3, sp_el0
+	push x30, x3
+
+	msr	 cntvoff_el2,x1
 	mrs	x1, tpidr_el2
-	bl get_hyplet_addr
-	cmp	x0,xzr
-	beq 2f
+	bl get_hyplet_addr // get_hyplet_addr(func id, hyp ). make sure not to read time
+	cmp	x0, xzr
+	beq 3f
 
 // prepare stack and code
 	mrs	x1, tpidr_el2
 	ldr	x2, [x1, HYPLET_STACK]
 	msr	sp_el0,x2
-	ldr	x30,[x1, HYPLET_CODE]
+	ldr	x2, [x1, HYPLET_CODE]
 
-	mrs 	x1, spsel
-	and 	w1,w1,#0xFFFFFFFE
-	msr  	spsel,x1
-	blr 	x30
-	mrs 	x1, spsel
-	orr 	w1, w1, #0x1
-	msr 	spsel,x1
+	mrs x1, spsel
+	and w1,w1,#0xFFFFFFFE
+	msr spsel,x1
 
-2:
+// pass stack parameter
+	mrs x0, cntvoff_el2 // user_hyplet(val)
+	msr cntvoff_el2, xzr
+	blr x2
+
+// reset stack back
+	mrs x1, spsel
+	orr w1, w1, #0x1
+	msr spsel,x1
+// save return value
+	msr	cntvoff_el2,x0
+	b 4f
+//
+// exit to kernel to search for the right core
+3:
+	mrs x0, tpidr_el2
+	mrs x1, elr_el2
+	str x1, [x0, #HYPLET_ELR_EL2]
+	mrs x1, sp_el0
+	str x1, [x0, #HYPLET_SP_EL0]
+	pop x30, x3
+
+
+// switch context
+	ldr x0,=hyplet_search_func // <-- id,val
+ 	msr elr_el2,x0
+	mrs x1,spsr_el2
+	and w1, w1, #0xFFFFFFF0
+	mov x0, #5
+	orr x1, x1, x0
+	msr spsr_el2,x1
+
+// prepare arguments
+	mrs	x2, tpidr_el2
+	ldr x0,[x2, HYPLET_USER_HYPLET_ID]
+	ldr	x1,[x2, #HYPLET_VAL]
+ // will jump to the kernel now
+	eret
+
+4:	mrs	x0, elr_el2
+	add	x0, x0, #4
+	msr	elr_el2,x0
+
+// restore user's stack
+5:	pop x30, x3
+	msr sp_el0, x3
+
 	pop_registers
-	ret
+// restore return value
+	mrs     x0, cntvoff_el2
+	msr 	cntvoff_el2, xzr
+	eret
 ENDPROC(hyplet_rpc)
+
+/*
+ * Called to complete the IPI.
+ * returns to user space sender
+  * x0 = return value
+*/
+ENTRY(hyplet_complete_smp_rpc)
+
+	pop lr,xzr
+	push x0,x1
+	push x2,x3
+
+	mrs x2, tpidr_el2
+	ldr x3, [x2, #HYPLET_ELR_EL2]
+	add	x3, x3, #4
+	msr elr_el2, x3
+
+// prepare the return value
+	msr 	cntvoff_el2, x0
+	pop 	x2,x3
+	pop 	x0,x1
+//	back to EL0t
+	mrs x0, spsr_el2
+	and x0,x0, 0xFFFFFFF0
+	msr spsr_el2,x0
+// restore user regs to their original state when the user entered
+	pop_registers
+// load return value
+	mrs     x0, cntvoff_el2
+	msr 	cntvoff_el2, xzr
+
+	eret
+ENDPROC(hyplet_complete_smp_rpc)
 /*
 * This procedure calls the default hypervisor vector and
 * and sets truly vector. This is because when the cpu drops
@@ -227,16 +348,6 @@ ENTRY(hyplet_set_vectors)
 	ret
 ENDPROC(hyplet_set_vectors)
 
-/*
- * put all tables to the processor's 0
-*/
-ENTRY(hyplet_set_cxt)
-	kern_hyp_va  x0
-	msr tpidr_el2, x0
-	msr	ttbr0_el2, x1
-	ret
-ENDPROC(hyplet_set_cxt)
-
 ENTRY(hyplet_call_hyp)
 	hvc	#0
 	ret
@@ -246,7 +357,7 @@ ENDPROC(hyplet_call_hyp)
  * turn on brk trap
 */
 ENTRY(hyplet_brk_on)
-	mov	x0,#0x100
+	mov	x0, #0x100
 	msr mdcr_el2,x0
 	ret
 ENDPROC(hyplet_brk_on)
@@ -282,10 +393,10 @@ ENTRY(hyplet_run_user)
 /* pop the time stamp */
 	ldr	x2, [x0, HYPLET_TIMESTAMP]
 	msr 	cntvoff_el2,x2
-/*  EL2t. Switch stacks */
+/*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
 	mrs 	 x1, spsel
 	and 	 w1,w1,#0xFFFFFFFE
-	msr  	spsel,x1
+	msr  	 spsel,x1
 
 	blr 	x30 // Execute hyplet in EL2
 /*
@@ -313,10 +424,6 @@ ENTRY(hyplet_on)
 
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
-
-
-	mrs	x1,ttbr0_el2
-	str	x1, [x0, #HYPLET_TTBR0_EL2]
 
 // enable MMU
 	mov		x0, #1
