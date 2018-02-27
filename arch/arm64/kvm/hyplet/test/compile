@@ -30,7 +30,7 @@ $CC  -g -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyple
 $CC  -c hyplet_utilsS.S
 $CC  -g -I ../../../../../include  -c rpcsender.c  
 $CC  -g -I ../../../../../include  rpcsender.o   hyplet_utils.o hyplet_utilsS.o  -o rpcsender
-$CC  -g -I ../../../../../include  rpcreciever.c hyplet_utils.o hyplet_utilsS.o  -o rpcrecv
+$CC  -g -I ../../../../../include  rpcreceiver.c hyplet_utils.o hyplet_utilsS.o  -o rpcrecv
 
 sudo mount /dev/mapper/loop0p2 /mnt/
 sudo cp rpcsender /mnt/home/root/ 
