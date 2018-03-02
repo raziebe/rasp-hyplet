@@ -40,12 +40,6 @@ int hyplet_start(void)
 		return -1;
 	}
 
-	rc = hyplet_rpc_set(user_hyplet, func_id);
-	if (rc){
-		fprintf(stderr, "hyplet: Failed to set rpc\n");
-		return -1;
-	}
-
 	rc = posix_memalign(&stack_addr,
 			    sysconf(_SC_PAGESIZE), stack_size);
 	if (rc < 0) {
@@ -63,6 +57,13 @@ int hyplet_start(void)
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
+
+	rc = hyplet_rpc_set(user_hyplet, func_id);
+	if (rc){
+		fprintf(stderr, "hyplet: Failed to set rpc\n");
+		return -1;
+	}
+
 	return 0;
 }
 

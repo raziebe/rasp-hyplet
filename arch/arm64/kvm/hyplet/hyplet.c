@@ -161,6 +161,7 @@ void close_hyplet(void *task)
 	tsk =  (struct task_struct *)task;
 	if (hyp->tsk->mm != tsk->mm)
 		return;
+	hyplet_call_hyp(hyplet_trap_off);
 	hyp->tsk = NULL;
 	hyp->irq_to_trap = 0;
 	hyp->gic_irq = 0;
@@ -205,6 +206,7 @@ int hyplet_set_func(struct hyplet_ctrl* hplt)
 
 	hyp->hyplet_id = hplt->__action.rpc_set_func.func_id;
 	hyp->tsk = current;
+	hyplet_call_hyp(hyplet_trap_on);
 	return 0;
 }
 
@@ -213,6 +215,12 @@ int hyplet_ctl(unsigned long arg)
 	struct hyplet_vm *hyp = hyplet_get_vm();
 	struct hyplet_ctrl hplt;
 	int rc = -1;
+
+	if (hyp->tsk
+			&& hyp->tsk->mm != current->mm) {
+		hyplet_err(" hyplet busy\n");
+		return -EBUSY;
+	}
 
 	if ( copy_from_user(&hplt, (void *) arg, sizeof(hplt)) ){
 		hyplet_err(" failed to copy from user");

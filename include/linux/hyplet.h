@@ -110,8 +110,9 @@ struct hyplet_vm {
 	unsigned long sp_el0;
 	unsigned long user_val;
 	unsigned long user_hyplet_id; // used to pass parameters between cores
-	unsigned long hyplet_stack;
-	unsigned long user_hyplet_code;
+
+	unsigned long hyplet_stack;	// this core hyplet stack
+	unsigned long user_hyplet_code;	// this core hyplet codes
 	int		hyplet_id __attribute__ ((packed));//  the hyplet of this core
 
 	struct task_struct *tsk;
@@ -155,7 +156,8 @@ unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 			hyplet_set_cxt(long addr);
 int 			hyplet_imp_timer(void);
-void 			hyplet_complete_smp_rpc(void);
+void 			hyplet_trap_on(void);
+void 			hyplet_trap_off(void);
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 extern int __create_hyp_mappings(pgd_t *pgdp,
