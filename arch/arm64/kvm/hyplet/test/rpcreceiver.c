@@ -35,11 +35,6 @@ static int hyplet_rpc_start(void)
 	int func_id = 0x17;
 	int func_size = 0x92;
 
-	if (hyplet_map(HYPLET_MAP_HYPLET, user_hyplet, func_size)) {
-		fprintf(stderr, "hyplet: Failed to map code\n");
-		return -1;
-	}
-
 	rc = posix_memalign(&stack_addr,
 			    sysconf(_SC_PAGESIZE), stack_size);
 	if (rc < 0) {
@@ -48,13 +43,19 @@ static int hyplet_rpc_start(void)
 	}
 
 	memset(stack_addr, 0x00, stack_size);
+
+	if (hyplet_map_all()) { // map all possible process's vmas
+		fprintf(stderr, "hyplet: Failed to map a stack\n");
+		return -1;
+	}
+
 	if (hyplet_map(HYPLET_MAP_STACK, stack_addr, stack_size)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &t1, -1)) {
-		fprintf(stderr, "hyplet: Failed to map a stack\n");
+	if (hyplet_set_callback(user_hyplet) ){
+		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
 

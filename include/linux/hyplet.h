@@ -85,35 +85,29 @@ enum { DEFAULT_BLOCK_SIZE=16 };
 enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
 
 #define USER_CODE_MAPPED		UL(1) << 1
-#define USER_STACK_MAPPED		UL(1) << 2
-#define USER_MEM_ANON_MAPPED	UL(1) << 3
-#define USER_NO_SIZE			UL(1) << 4
-
-
 #define	IRQ_TRAP_ALL			UL(0xFFFF)
 
 struct hyp_addr {
 	struct list_head lst;
 	unsigned long addr;
 	int size;
-	int type;
+	int flags;
 	int nr_pages;
 
 };
 
 struct hyplet_vm {
-	unsigned int int_cnt __attribute__ ((packed));
-//	unsigned int gic_irq __attribute__ ((packed));
 	unsigned int irq_to_trap __attribute__ ((packed));
-	unsigned long ts;
-	unsigned long elr_el2;
+	int	hyplet_id __attribute__ ((packed));//  the hyplet of this core
 	unsigned long sp_el0;
-	unsigned long user_val;
-	unsigned long user_hyplet_id; // used to pass parameters between cores
+	unsigned long user_arg1;
+	unsigned long user_arg2;
+	unsigned long user_arg3;
+	unsigned long user_arg4;
+	unsigned long elr_el2;
 
 	unsigned long hyplet_stack;	// this core hyplet stack
 	unsigned long user_hyplet_code;	// this core hyplet codes
-	int		hyplet_id __attribute__ ((packed));//  the hyplet of this core
 
 	struct task_struct *tsk;
 
@@ -154,10 +148,13 @@ unsigned long   hyplet_clear_cache(pte_t* addr,long size);
 int 			create_hyp_mappings(void *, void *);
 unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
-void 			hyplet_set_cxt(long addr);
-int 			hyplet_imp_timer(void);
-void 			hyplet_trap_on(void);
-void 			hyplet_trap_off(void);
+void 		hyplet_set_cxt(long addr);
+int 		hyplet_imp_timer(void);
+void 		hyplet_trap_on(void);
+void 		hyplet_trap_off(void);
+int 		hyplet_check_mapped(void *action);
+int		hyplet_map_user(void);
+
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 extern int __create_hyp_mappings(pgd_t *pgdp,

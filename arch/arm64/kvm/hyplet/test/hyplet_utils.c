@@ -16,12 +16,13 @@ int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt)
 	return syscall(SYSCALL_HYPLET,hplt);
 }
 
-int hyplet_map(int cmd, void *addr,int size)
+
+int hyplet_map(int cmd, unsigned long addr,int size)
 {
 	int rc;
 	struct hyplet_ctrl hplt;
 
-	hplt.__action.addr.addr = (unsigned long)addr;
+	hplt.__action.addr.addr = addr;
 	hplt.__action.addr.size = size;
 	rc = hyplet_ctl(cmd, &hplt);
 	if (rc < 0){
@@ -32,14 +33,16 @@ int hyplet_map(int cmd, void *addr,int size)
 }
 
 
-int hyplet_test(int cmd)
+int hyplet_set_callback(void *addr)
 {
 	int rc;
 	struct hyplet_ctrl hplt;
 
-	rc = hyplet_ctl(cmd , &hplt);
+	hplt.__action.addr.addr = (unsigned long)addr;
+
+	rc = hyplet_ctl(HYPLET_SET_CALLBACK, &hplt);
 	if (rc < 0){
-		printf("hyplet: Failed assign irq\n");
+		printf("hyplet: Failed to map code\n");
 		return -1;
 	}
 	return 0;
@@ -87,6 +90,17 @@ int hyplet_untrap_irq(int irq)
 	return 0;
 }
 
+int hyplet_set_stack(unsigned long addr,int size)
+{
+	return hyplet_map(HYPLET_MAP_STACK, addr, size);
+}
+
+int hyplet_map_all(void)
+{
+	struct hyplet_ctrl hplt;
+	return hyplet_ctl(HYPLET_MAP_ALL, &hplt);
+}
+
 /*
  * associate a function with an id
  */
@@ -98,8 +112,7 @@ int hyplet_rpc_set(void *user_hyplet,int func_id)
 	hplt.__action.rpc_set_func.func_addr = (long)user_hyplet;
 	hplt.__action.rpc_set_func.func_id = func_id;
 
-
-	rc = hyplet_ctl(HYPLET_SET_FUNC, &hplt);
+	rc = hyplet_ctl(HYPLET_SET_RPC, &hplt);
 	if (rc < 0 ){
 		printf("hyplet: Failed assign irq\n");
 		return -1;

@@ -9,7 +9,6 @@
 #include <linux/hyplet_user.h>
 #include "hyplet_utils.h"
 
-
 int main(int argc,char *argv[])
 {
 	long min = 1000000, max = 0, tot = 0, avg;
@@ -26,7 +25,7 @@ int main(int argc,char *argv[])
 	}else{
 		printf("return value %ld: as expected \n",rc);
 	}
-	for ( ; i < iters; i++){
+	for (; i < iters; i++){
 		t1 = cycles();
 		rc = hyplet_rpc_call(func_id, t1);
 		t3 = cycles();

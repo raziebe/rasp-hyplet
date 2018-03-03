@@ -27,9 +27,10 @@ int hyplet_imp_timer(void)
 
 	hyp->irq_to_trap = IRQ_TRAP_ALL;
 
-	if (!(hyp->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
+	if (!(hyp->state & USER_CODE_MAPPED)){
 		return -EINVAL;
 	}
+
 	hyp->tsk = current;
 	hyplet_info("Implement timer\n");
 	return 0;
@@ -40,9 +41,11 @@ int hyplet_trap_irq(int irq)
 	struct hyplet_vm *tv = hyplet_get_vm();
 
 	tv->tsk = current;
-	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
+
+	if (!(tv->state & USER_CODE_MAPPED)){
 		return -EINVAL;
 	}
+
 	tv->irq_to_trap = irq;
 	hyplet_info("Trapping irq %d\n", irq);
 	return 0;
@@ -65,11 +68,6 @@ int hyplet_run(int irq)
 	if (irq == hyp->irq_to_trap
 			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
 
-		struct timespec64 tv;
-
-
-		getnstimeofday64(&tv);
-		hyp->ts = tv.tv_sec * NSEC_PER_SEC + tv.tv_nsec;
 		hyplet_call_hyp(hyplet_run_user);
 	}
 	return 0; // TODO

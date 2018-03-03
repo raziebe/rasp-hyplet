@@ -3,33 +3,41 @@
 # This script compiles and links and the binary
 # We do some elf parsing here because we need to know the 
 # hyplet size in advance.
+# kpartx -a opt/truly/linaro_fvp/armv8.img
 #
 CC=/opt//gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc 
 READELF=/opt/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-readelf
 OBJDUMP=/opt/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-objdump
 
-$CC -g -pthread -I ../../../../../include  -c test_hyplet.c
+# simple isr hyplet
+$CC   -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
 
-$READELF -a test_hyplet.o |grep user_hyplet | grep FUNC > /tmp/sz
-#
-# create test_hyplet.h 
-#
-HYPLET_SIZE=$(awk '{print $3}' /tmp/sz)
-# auto generate hyplet size
-printf  "#define HYPLET_SIZE $HYPLET_SIZE"  > test_hyplet.h
+# timer usr hyplet
+$CC   -pthread -I ../../../../../include   -c test_isr_hyplet.c
+$CC   -pthread -I ../../../../../include  -c  hyplet_utils.c 
+$CC   -pthread -I ../../../../../include   -c main_test_hyplet.c
+$CC   -pthread main_test_hyplet.o test_isr_hyplet.o hyplet_utils.o -o  test_hyplet
 
-rm -f /tmp/sz
 
-$CC  -g -pthread -I ../../../../../include  -c hyplet_utils.c 
-$CC  -g -pthread -I ../../../../../include   -c main_test_hyplet.c
-$CC  -g -pthread main_test_hyplet.o test_hyplet.o hyplet_utils.o -o  test_hyplet_isr
-
-#
-# simple hyplet : irq tester
-$CC  -g -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet_isr
-
-# rpc test
+# hyp rpc test
 $CC  -c hyplet_utilsS.S
-$CC  -g -I ../../../../../include  -c rpcsender.c  
-$CC  -g -I ../../../../../include  rpcsender.o   hyplet_utils.o hyplet_utilsS.o  -o rpcsender
-$CC  -g -I ../../../../../include  rpcreceiver.c hyplet_utils.o hyplet_utilsS.o  -o rpcrecv
+$CC   -I ../../../../../include  -c rpcsender.c  
+$CC   -I ../../../../../include  rpcsender.o   hyplet_utils.o hyplet_utilsS.o  -o rpcsender
+$CC   -I ../../../../../include  rpcreceiver.c hyplet_utils.o hyplet_utilsS.o  -o rpcrecv
+
+
+# hyp performance test
+$CC  -c hyplet_utilsS.S
+$CC  -c -I ../../../../../include fft_hyplet.c
+$CC  -c -I ../../../../../include fft_hyplet_ref.c
+$CC  -I ../../../../../include fft_hyplet.o hyplet_utils.o hyplet_utilsS.o -o hyp_perf_test
+$CC  -I ../../../../../include fft_hyplet_ref.o hyplet_utils.o hyplet_utilsS.o -o hyp_perf_test_ref
+
+
+#sudo mount /dev/mapper/loop0p2 /media/fvp
+#sudo cp simple_hyplet /media/fvp//home/root/
+#sudo cp test_hyplet /media/fvp/home/root/
+#sudo cp rpcsender /media/fvp/home/root/ 
+#sudo cp rpcrecv /media/fvp/home/root/
+#sudo cp hyp_perf_test /media/fvp/home/root/
+#sudo umount /media/fvp

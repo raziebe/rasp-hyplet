@@ -87,7 +87,7 @@ int take_options(int argc, char *argv[])
 			break;
 		default:	/* '?' */
 			fprintf(stderr,
-				"Usage: %s [-l loops ] -i <irq> -a<timer>\n",
+				"Usage: %s [-l loops ] -i <irq> -a[do timer]\n",
 				argv[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -97,17 +97,13 @@ int take_options(int argc, char *argv[])
 }
 
 
-int hyplet_isr_start(int hyplet_code_size)
+int hyplet_isr_start(void)
 {
 	int rc;
 	int stack_size = sysconf(_SC_PAGESIZE) * 50;
 	void *stack_addr;
 	int heap_sz;
 
-	if (hyplet_map(HYPLET_MAP_HYPLET, isr_user_hyplet, hyplet_code_size)) {
-		fprintf(stderr, "hyplet: Failed to map code\n");
-		return -1;
-	}
 	/*
 	 * create a stack
 	 */
@@ -119,33 +115,33 @@ int hyplet_isr_start(int hyplet_code_size)
 	}
 
 	memset(stack_addr, 0x00, stack_size);
-	if (hyplet_map(HYPLET_MAP_STACK, stack_addr, stack_size)) {
-		fprintf(stderr, "hyplet: Failed to map a stack\n");
-		return -1;
-	}
 
-	if (hyplet_map(HYPLET_MAP_ANY, &prev_ts, -1)) {
-		fprintf(stderr, "hyplet: Failed to map a stack\n");
-		return -1;
-	}
-
+// create the heap
 	heap_sz = sizeof(long) * hist_size;
 	hist = malloc(heap_sz);
 	memset(hist, 0x00, heap_sz);
-	if (hyplet_map(HYPLET_MAP_ANY, hist, heap_sz)) {
-		fprintf(stderr, "hyplet: Failed to map a heap\n");
-		return -1;
-	}
 
 	hist_neg = malloc(heap_sz);
 	memset(hist_neg, 0x00, heap_sz);
-	if (hyplet_map(HYPLET_MAP_ANY, hist_neg, heap_sz)) {
-		fprintf(stderr, "hyplet: Failed to map a heap\n");
+
+	if (hyplet_map_all()) { // map all possible vmas
+		fprintf(stderr, "hyplet: Failed to map a vmas\n");
 		return -1;
 	}
+
+	if (hyplet_set_stack((unsigned long)stack_addr, stack_size)) {
+		fprintf(stderr, "hyplet: Failed to map a stack\n");
+		return -1;
+	}
+
+	if (hyplet_set_callback(isr_user_hyplet) ){
+		fprintf(stderr, "hyplet: Failed to map code\n");
+		return -1;
+	}
+
 	if (irq  ==  HYPLET_IMP_TIMER) {
 		if (hyplet_trap_all_irqs()) {
-			printf("hyplet: Failed to map user's data\n");
+			printf("hyplet: Failed to set timer trap\n");
 			return -1;
 		}
 		return 0;

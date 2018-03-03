@@ -10,8 +10,8 @@
 #include <linux/hyplet_user.h>
 
 extern long 	dt_max,
-		dt_min,
-		dt_zeros;
+				dt_min,
+				dt_zeros;
 extern int loops;
 extern int count;
 extern long* hist;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
 	printf("PI3 test configuration: LPJ is 19.z Mhz , ie; 52ns a tick\n");
 
-	hyplet_isr_start(HYPLET_SIZE);
+	hyplet_isr_start();
 	gettimeofday(&tv1, NULL);
 	i = 0;
 	while (1) {

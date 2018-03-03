@@ -4,4 +4,4 @@
 
 hyplet_rpc_call:
 	brk  #4
-ret
+	ret

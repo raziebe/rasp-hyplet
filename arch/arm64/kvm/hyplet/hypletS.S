@@ -158,87 +158,95 @@ ENDPROC(hyplet_invld_tlb)
 */
 ENTRY(hyplet_clear_cache)
 
-        push	x1, x0
-        push 	x2, x3
+        push   x1, x0
+        push   x2, x3
 
-        mrs 	x3, ctr_el0
-        ubfx	x3, x3,#16,#4 	// x3  = DminLine
-        mov		x2, #4   		// x2=word size
-        lsl		x2, x2, x3 		// x2 = smallet cache line size
+        mrs    x3, ctr_el0
+        ubfx   x3, x3,#16,#4  // x3  = DminLine
+        mov    x2, #4         // x2=word size
+        lsl    x2, x2, x3     // x2 = smallet cache line size
 
-        add     x1, x0, x1 		// end
+        add     x1, x0, x1    // end
         tlbi    vaae1 ,x0
 
-1:      dc      civac, x0                       // clean & invalidate D line / unified line
+1:      dc      civac, x0     // clean & invalidate D line / unified line
         ic      ivau, x0
         dsb     ish
         add     x0, x0, x2
         cmp     x0, x1
         b.lo    1b
 
-        pop x2,	x3
-        pop x1,	x0
+        pop x2,        x3
+        pop x1,        x0
         isb
         ret
 ENDPROC(hyplet_clear_cache)
 
 // Called by a brk trap
-// x1 parameter
+
+// x1..4  - arg 1 .. arg4
 // x0 = hyplet_id
 ENTRY(hyplet_rpc)
 
 	push_registers
 
-	mrs	x2, tpidr_el2
-	str x0,[x2, #HYPLET_USER_HYPLET_ID]
-	str	x1,[x2, #HYPLET_VAL]
+	mrs	x5, tpidr_el2
 
-	mrs x3, sp_el0
-	str	x3,[x2, #HYPLET_SP_EL0]
-	msr	cntvoff_el2,x1
+	str	x1,[x5, #HYPLET_ARG1]
+	str	x2,[x5, #HYPLET_ARG2]
+	str	x3,[x5, #HYPLET_ARG3]
+	str	x4,[x5, #HYPLET_ARG4]
+
+// save current stack
+	mrs x2, sp_el0
+	str	x2,[x5, #HYPLET_SP_EL0]
+// check func id
 	mrs	x1, tpidr_el2
 	bl get_hyplet_addr // get_hyplet_addr(func id, hyp )
 	cmp	x0, xzr
 	bne 2f
 	mov	x0, #(-1)
-	msr	cntvoff_el2, x0
+	msr	cntvoff_el2,x0
 	b 3f
 /*
-* Local hyplet found
-* prepare stack and code
+* Local hyplet found . prepare el0 stack ,code and arguments
 */
 2:
-	mrs	x1, tpidr_el2
-	ldr	x2, [x1, #HYPLET_STACK]
+	mrs	x4, tpidr_el2
+	ldr	x2, [x4, #HYPLET_STACK]
 	msr	sp_el0,x2
-	ldr	x2, [x1, #HYPLET_CODE]
 
 	mrs x1, spsel
 	and w1,w1,#0xFFFFFFFE
 	msr spsel,x1
 
-// pass stack parameter and call hyplet
-	mrs x0, cntvoff_el2 // user_hyplet(val)
-	msr cntvoff_el2, xzr
-	blr x2
+// prepare to call rpc
+	ldr	x30,[ x4, #HYPLET_CODE]
+	ldr	x0, [ x4, #HYPLET_ARG1]
+	ldr	x1, [ x4, #HYPLET_ARG2]
+	ldr	x2, [ x4, #HYPLET_ARG3]
+	ldr	x3, [ x4, #HYPLET_ARG4]
+
+	blr x30
+
+// save return value
+	msr	cntvoff_el2,x0
 //
 // reset stack back
 	mrs x1, spsel
 	orr w1, w1, #0x1
 	msr spsel,x1
-// save return value
-	msr	cntvoff_el2,x0
-
 
 3:	mrs	x0, elr_el2
 	add	x0, x0, #4
 	msr	elr_el2,x0
 
-	mrs x0,tpidr_el2
-	ldr x3,[x0, #HYPLET_SP_EL0]
+	mrs x4,tpidr_el2
+	ldr x3,[x4, #HYPLET_SP_EL0]
 	msr sp_el0, x3
 
 	pop_registers
+
 // restore return value
 	mrs     x0, cntvoff_el2
 	msr 	cntvoff_el2, xzr
@@ -290,18 +298,11 @@ ENTRY(hyplet_run_user)
 	push_registers
 
 	mrs	x0, tpidr_el2
-// 	statitics here.
-	ldr	x1, [x0, #HYPLET_CNT]	
-	add	x1, x1, #1
-	str	x1, [x0, #HYPLET_CNT]
 
 	ldr	x1, [x0, HYPLET_STACK]
 	msr	sp_el0,x1
 	ldr	x30,[x0, HYPLET_CODE]
 
-/* pop the time stamp */
-	ldr	x2, [x0, HYPLET_TIMESTAMP]
-	msr 	cntvoff_el2,x2
 /*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
 	mrs 	 x1, spsel
 	and 	 w1,w1,#0xFFFFFFFE
@@ -316,6 +317,7 @@ ENTRY(hyplet_run_user)
 	msr 	spsel,x1
 
 	msr 	cntvoff_el2,xzr
+
 	pop_registers
 
 	ret

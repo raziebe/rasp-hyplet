@@ -59,7 +59,8 @@ int hyplet_map(int cmd, void *addr,int size);
 int hyplet_untrap_irq(int irq);
 int hyplet_rpc_set(void *user_hyplet,int func_id);
 long hyplet_rpc_call(int func_id,...);
-int hyplet_set_smp(void);
+int hyplet_map_all(void);
+int hyplet_set_stack(unsigned long addr,int size);
 
 #endif
 
