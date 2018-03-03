@@ -30,7 +30,7 @@ int hist_size	= 10000;
 /*
  * Implemented as timer0 hyplet
 */
-long user_hyplet(void)
+long isr_user_hyplet(void)
 {
 	long long times_offset= 0;
 	s64 dt = 0;
@@ -87,7 +87,7 @@ int take_options(int argc, char *argv[])
 			break;
 		default:	/* '?' */
 			fprintf(stderr,
-				"Usage: %s [-l loops ] -i <irq> \n",
+				"Usage: %s [-l loops ] -i <irq> -a<timer>\n",
 				argv[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -97,14 +97,14 @@ int take_options(int argc, char *argv[])
 }
 
 
-int hyplet_start(int hyplet_code_size)
+int hyplet_isr_start(int hyplet_code_size)
 {
 	int rc;
 	int stack_size = sysconf(_SC_PAGESIZE) * 50;
 	void *stack_addr;
 	int heap_sz;
 
-	if (hyplet_map(HYPLET_MAP_HYPLET, user_hyplet, hyplet_code_size)) {
+	if (hyplet_map(HYPLET_MAP_HYPLET, isr_user_hyplet, hyplet_code_size)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}

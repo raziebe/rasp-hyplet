@@ -103,7 +103,7 @@ struct hyp_addr {
 
 struct hyplet_vm {
 	unsigned int int_cnt __attribute__ ((packed));
-	unsigned int gic_irq __attribute__ ((packed));
+//	unsigned int gic_irq __attribute__ ((packed));
 	unsigned int irq_to_trap __attribute__ ((packed));
 	unsigned long ts;
 	unsigned long elr_el2;

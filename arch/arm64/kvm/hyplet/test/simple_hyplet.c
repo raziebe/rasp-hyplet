@@ -74,23 +74,23 @@ int hyplet_start(void)
 	return 0;
 }
 
+/*
+ * it is essential affine the program to the same 
+ * core where it runs.
+*/
 int main(int argc, char *argv[])
 {
 	int rc;
 
-	printf("size of hyplet_ctrl %d\n",sizeof(struct hyplet_ctrl));
         if (argc <= 1 ){
-		struct hyplet_ctrl hyp;
-                printf("hyplet: must supply an irq , "
-                        "please look in /proc/interrupts \n");
-		hyplet_ctl( HYPLET_DUMP_HWIRQ , &hyp );
+                puts("hyplet: must supply an irq , "
+                        "please look in /proc/interrupts\n");
                 return -1;
         }
 
         irq = atoi(argv[1]);
-	
 	hyplet_start();
-	sleep(2);
+	printf("Waiting for irq %d for 20 seconds\n",irq);
+	sleep(20);
 	printf("some global %d\n",some_global);
-	
 }

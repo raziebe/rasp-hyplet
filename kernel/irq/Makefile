@@ -1,4 +1,9 @@
 
+
+ifeq ($(CONFIG_HYPLET), y)
+CFLAGS_irqdesc.o  +=  -D__HYPLET__
+endif
+
 obj-y := irqdesc.o handle.o manage.o spurious.o resend.o chip.o dummychip.o devres.o
 obj-$(CONFIG_GENERIC_IRQ_CHIP) += generic-chip.o
 obj-$(CONFIG_GENERIC_IRQ_PROBE) += autoprobe.o

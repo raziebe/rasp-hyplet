@@ -31,53 +31,20 @@ int hyplet_imp_timer(void)
 		return -EINVAL;
 	}
 	hyp->tsk = current;
-	mb();
 	hyplet_info("Implement timer\n");
-	return 0;
-}
-
-
-int hyplet_dump_irqs(void)
-{
-	int i;
-	for (i = 0; i < 0x3FF; i++) {
-		int irq = hyplet_hwirq_to_irq(i);
-		if (irq != 0)
-			printk("hwirq %d : irq %d\n", i, irq);
-	}
-	return 0;
-}
-
-int hyplet_search_irq(int lirq)
-{
-	int i;
-
-	for (i = 0; i < 0x3FF; i++) {
-		int irq = hyplet_hwirq_to_irq(i);
-		if (irq == lirq)
-			return i;
-	}
 	return 0;
 }
 
 int hyplet_trap_irq(int irq)
 {
 	struct hyplet_vm *tv = hyplet_get_vm();
-	int hwirq;
-
-	hwirq = hyplet_search_irq(irq);
-	if (hwirq == 0){
-		hyplet_err("invalid irq %d\n",irq);
-		return -EINVAL;
-	}
 
 	tv->tsk = current;
 	if (!(tv->state & (USER_CODE_MAPPED | USER_STACK_MAPPED))){
 		return -EINVAL;
 	}
-	tv->irq_to_trap = hwirq;
-	hyplet_info("Trapping irq %d local irq %d\n", irq,hwirq);
-	mb();
+	tv->irq_to_trap = irq;
+	hyplet_info("Trapping irq %d\n", irq);
 	return 0;
 }
 
@@ -87,7 +54,7 @@ int hyplet_untrap_irq(int irq)
 	return 0;
 }
 
-int hyplet_run(int hwirq)
+int hyplet_run(int irq)
 {
 	struct hyplet_vm *hyp;
 	
@@ -95,7 +62,7 @@ int hyplet_run(int hwirq)
 	if (hyp->tsk == NULL)
 		return 0; 
 
-	if (hwirq == hyp->irq_to_trap
+	if (irq == hyp->irq_to_trap
 			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
 
 		struct timespec64 tv;

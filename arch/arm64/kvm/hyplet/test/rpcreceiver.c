@@ -26,7 +26,7 @@ long user_hyplet(long _t1)
 }
 
 
-int hyplet_start(void)
+static int hyplet_rpc_start(void)
 {
 	int rc;
 	int stack_size = sysconf(_SC_PAGESIZE) * 2;
@@ -69,8 +69,8 @@ int hyplet_start(void)
 
 int main(int argc, char *argv[])
 {
+	hyplet_rpc_start();
 
-	hyplet_start();
 	while(run){
 	//	printf("RECV:%d Waiting..run %d\n",getpid(),run);
 		usleep(100000);
