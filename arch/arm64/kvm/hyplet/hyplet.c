@@ -9,11 +9,6 @@
 #include <linux/init.h>
 #include <asm/sections.h>
 #include <linux/proc_fs.h>
-//#include <linux/slab.h>
-//#include <asm/page.h>
-//#include <linux/vmalloc.h>
-//#include <asm/fixmap.h>
-//#include <asm/memory.h>
 #include <linux/delay.h>
 
 #include <linux/hyplet.h>
@@ -57,10 +52,10 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 	for_each_online_cpu(cpu) {
 		struct hyplet_vm *tv = &per_cpu(HYPLETS, cpu);
 		len += sprintf(page + len, "cpu%d cnt=%d"
-				" irq=%d dbg=%d\n", 
+				" irq=%d\n", 
 				   cpu,
 				   tv->int_cnt,
-			       	   tv->gic_irq, tv->dbg);
+			       	   tv->dbg);
 	}
 
 	filp->private_data = 0x00;
@@ -139,14 +134,13 @@ void hyplet_setup(void)
 		hyplet_info("vbar_el2 should restore\n");
 		hyplet_set_vectors(vbar_el2);
 	}
-	tv->gic_irq = 0;
 	hyplet_call_hyp(hyplet_on, tv, NULL);
 }
 
 int is_hyplet_on(void)
 {
 	struct hyplet_vm *tv = hyplet_get_vm();
-	return (tv->gic_irq != 0);
+	return (tv->irq_to_trap != 0);
 }
 
 void close_hyplet(void *task)
@@ -164,7 +158,6 @@ void close_hyplet(void *task)
 	hyplet_call_hyp(hyplet_trap_off);
 	hyp->tsk = NULL;
 	hyp->irq_to_trap = 0;
-	hyp->gic_irq = 0;
 	hyp->hyplet_id = 0;
 	hyp->user_hyplet_code = 0;
 	hyplet_free_mem(hyp);
@@ -252,9 +245,6 @@ int hyplet_ctl(unsigned long arg)
 
 		case HYPLET_UNTRAP_IRQ:
 				return hyplet_untrap_irq(hplt.__action.irq);
-
-	   	case HYPLET_DUMP_HWIRQ:
-				return hyplet_dump_irqs();
 
 		case HYPLET_IMP_TIMER:
 				return hyplet_imp_timer();

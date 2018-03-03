@@ -3,7 +3,6 @@
 # This script compiles and links and the binary
 # We do some elf parsing here because we need to know the 
 # hyplet size in advance.
-# kpartx -a opt/truly/linaro_fvp/armv8.img
 #
 CC=/opt//gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc 
 READELF=/opt/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-readelf
@@ -23,16 +22,14 @@ rm -f /tmp/sz
 
 $CC  -g -pthread -I ../../../../../include  -c hyplet_utils.c 
 $CC  -g -pthread -I ../../../../../include   -c main_test_hyplet.c
-$CC  -g -pthread main_test_hyplet.o test_hyplet.o hyplet_utils.o -o  test_hyplet
-$CC  -g -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
+$CC  -g -pthread main_test_hyplet.o test_hyplet.o hyplet_utils.o -o  test_hyplet_isr
+
+#
+# simple hyplet : irq tester
+$CC  -g -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet_isr
 
 # rpc test
 $CC  -c hyplet_utilsS.S
 $CC  -g -I ../../../../../include  -c rpcsender.c  
 $CC  -g -I ../../../../../include  rpcsender.o   hyplet_utils.o hyplet_utilsS.o  -o rpcsender
 $CC  -g -I ../../../../../include  rpcreceiver.c hyplet_utils.o hyplet_utilsS.o  -o rpcrecv
-
-sudo mount /dev/mapper/loop0p2 /mnt/
-sudo cp rpcsender /mnt/home/root/ 
-sudo cp rpcrecv /mnt/home/root/
-sudo umount /mnt/

@@ -103,9 +103,7 @@ struct hyp_addr {
 
 struct hyplet_vm {
 	unsigned int int_cnt __attribute__ ((packed));
-	unsigned int gic_irq __attribute__ ((packed));
 	unsigned int irq_to_trap __attribute__ ((packed));
-	unsigned long ts;
 	unsigned long elr_el2;
 	unsigned long sp_el0;
 	unsigned long user_val;
@@ -113,7 +111,7 @@ struct hyplet_vm {
 
 	unsigned long hyplet_stack;	// this core hyplet stack
 	unsigned long user_hyplet_code;	// this core hyplet codes
-	int		hyplet_id __attribute__ ((packed));//  the hyplet of this core
+	int	hyplet_id __attribute__ ((packed));//  the hyplet of this core
 
 	struct task_struct *tsk;
 

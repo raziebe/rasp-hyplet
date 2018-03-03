@@ -31,7 +31,7 @@ static const int arm_arch_timer_reread = 1;
 
 static inline long cycles(void) {
 	long cval;
-	cval = ARCH_TIMER_READ("cntvct_el0"); 		
+	cval = ARCH_TIMER_READ("cntpct_el0"); 		
 	return cval;
 }
 

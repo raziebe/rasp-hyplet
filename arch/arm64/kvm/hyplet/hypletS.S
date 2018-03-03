@@ -290,18 +290,15 @@ ENTRY(hyplet_run_user)
 	push_registers
 
 	mrs	x0, tpidr_el2
-// 	statitics here.
-	ldr	x1, [x0, #HYPLET_CNT]	
-	add	x1, x1, #1
-	str	x1, [x0, #HYPLET_CNT]
 
 	ldr	x1, [x0, HYPLET_STACK]
 	msr	sp_el0,x1
 	ldr	x30,[x0, HYPLET_CODE]
 
 /* pop the time stamp */
-	ldr	x2, [x0, HYPLET_TIMESTAMP]
-	msr 	cntvoff_el2,x2
+//	ldr	x2, [x0, HYPLET_TIMESTAMP]
+//	msr 	cntvoff_el2,x2
+
 /*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
 	mrs 	 x1, spsel
 	and 	 w1,w1,#0xFFFFFFFE
@@ -315,7 +312,13 @@ ENTRY(hyplet_run_user)
 	orr 	w1, w1, #0x1
 	msr 	spsel,x1
 
+// 	statitics here.
+	mrs	x0, tpidr_el2
+	ldr	x1, [x0, #HYPLET_CNT]	
+	add	x1, x1, #1
+	str	x1, [x0, #HYPLET_CNT]
 	msr 	cntvoff_el2,xzr
+
 	pop_registers
 
 	ret
