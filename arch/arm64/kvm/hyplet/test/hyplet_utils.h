@@ -38,7 +38,19 @@ static inline long cycles(void) {
 }
 
 #else
+#ifdef __arm__
 
+static inline long cycles(void) {
+
+	struct timeval t;
+	
+	gettimeofday(&t,NULL);
+	
+	return t.tv_sec*1000000 + t.tv_usec;
+
+}
+
+#else
 static __inline__ unsigned long long rdtsc(void)
 {
     unsigned long x;
@@ -52,6 +64,7 @@ static inline long cycles(void) {
 	return cval;
 }
 
+#endif
 #endif
 
 static inline u64 cycles_to_ns()
