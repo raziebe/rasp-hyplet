@@ -29,18 +29,13 @@ static const int arm_arch_timer_reread = 1;
 	_val; \
 })
 
-#ifdef __aarch64__ 
-
 static inline long cycles(void) {
 	long cval;
 	cval = ARCH_TIMER_READ("cntvct_el0"); 		
 	return cval;
 }
 
-#else
-#ifdef __arm__
-
-static inline long cycles(void) {
+static inline long cycles_us(void) {
 
 	struct timeval t;
 	
@@ -49,23 +44,6 @@ static inline long cycles(void) {
 	return t.tv_sec*1000000 + t.tv_usec;
 
 }
-
-#else
-static __inline__ unsigned long long rdtsc(void)
-{
-    unsigned long x;
-    __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-    return x;
-}
-
-static inline long cycles(void) {
-	long cval;
-	cval = rdtsc();
-	return cval;
-}
-
-#endif
-#endif
 
 static inline u64 cycles_to_ns()
 {

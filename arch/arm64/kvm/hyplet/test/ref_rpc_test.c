@@ -51,10 +51,10 @@ int main (int argc, char **argv)
     if (pid != 0){
 
     	while(--iters > 0) {
-		t1 = cycles();
+		t1 = cycles_us();
 		sem_post (sem_child);           /* V operation */
 		sem_wait (sem_parent);           /* P operation */
-		t2 = cycles();
+		t2 = cycles_us();
 		dt  = t2 - t1;
 		tot += dt;
 		if (dt < min)
@@ -63,7 +63,7 @@ int main (int argc, char **argv)
 			max = dt;
 	}
 	avg = tot/ITERS;
-    	printf ("Parent min,avg,max= %ld,%ld,%ld\n",min,avg,max);
+    	printf ("Parent min,avg,max (us) = %ld,%ld,%ld\n",min,avg,max);
 	while (pid = waitpid (-1, NULL, 0)){
             if (errno == ECHILD)
                 break;
