@@ -33,6 +33,8 @@ $CC  -c -I ../../../../../include fft_hyplet_ref.c
 $CC  -I ../../../../../include fft_hyplet.o hyplet_utils.o hyplet_utilsS.o -o hyp_perf_test
 $CC  -I ../../../../../include fft_hyplet_ref.o hyplet_utils.o hyplet_utilsS.o -o hyp_perf_test_ref
 
+$CC  -pthread -c ref_rpc_test.c 
+$CC  -pthread ref_rpc_test.o hyplet_utilsS.o -o ref_rpc_test
 
 #sudo mount /dev/mapper/loop0p2 /media/fvp
 #sudo cp simple_hyplet /media/fvp//home/root/

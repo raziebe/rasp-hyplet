@@ -63,7 +63,7 @@ int main (int argc, char **argv)
 			max = dt;
 	}
 	avg = tot/ITERS;
-    	printf ("Parent new value of ticks=%ld. %ld,%ld,%ld\n", dt,min,avg,max);
+    	printf ("Parent min,avg,max= %ld,%ld,%ld\n",min,avg,max);
 	while (pid = waitpid (-1, NULL, 0)){
             if (errno == ECHILD)
                 break;
@@ -76,18 +76,8 @@ int main (int argc, char **argv)
     }
 
     while(--iters > 0) {
-	t1 = cycles();
 	sem_wait (sem_child); 
 	null_func();
        	sem_post (sem_parent); 
-	t2 = cycles();
-	dt  = t2 - t1;
-	tot += dt;
-	if (dt < min)
-		min = dt;
-	if (dt > max) 
-		max = dt;
     }
-
-    printf ("Child new value of ticks=%ld.\n", dt);
 }
