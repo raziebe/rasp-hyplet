@@ -57,6 +57,12 @@ int hyplet_untrap_irq(int irq)
 	return 0;
 }
 
+#ifdef __GPIO__
+#include <linux/gpio.h>
+int gpio = 475; // the gpio we toggle
+static int toggle = 0;
+#endif
+
 int hyplet_run(int irq)
 {
 	struct hyplet_vm *hyp;
@@ -69,6 +75,12 @@ int hyplet_run(int irq)
 			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
 
 		hyplet_call_hyp(hyplet_run_user);
+#ifdef __GPIO__
+	// it is expected that the gpio would be 
+	// exported and configured from user space
+	gpio_set_value(gpio, toggle);
+	toggle = !toggle;
+#endif
 	}
 	return 0; // TODO
 }
