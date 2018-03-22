@@ -112,9 +112,9 @@ struct hyplet_vm {
 	struct task_struct *tsk;
 
  	struct list_head hyp_addr_lst;
- 	unsigned int state __attribute__ ((packed));
-	unsigned int dbg __attribute__ ((packed));
-
+ 	unsigned long state __attribute__ ((packed));
+	unsigned long faulty_elr_el2 __attribute__ ((packed));
+	unsigned long faulty_esr_el2 __attribute__ ((packed));
 } __attribute__ ((aligned (8)));
 
 extern char __hyplet_vectors[];

@@ -56,6 +56,7 @@ int hyplet_untrap_irq(int irq)
 	hyplet_reset(current);
 	return 0;
 }
+//#define __GPIO__
 
 #ifdef __GPIO__
 #include <linux/gpio.h>
@@ -75,6 +76,14 @@ int hyplet_run(int irq)
 			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
 
 		hyplet_call_hyp(hyplet_run_user);
+		if (hyp->faulty_elr_el2){
+			printk("hyplet isr abort elr_el2 0x%lx esr_el2=%lx\n",
+					hyp->faulty_elr_el2 , hyp->faulty_esr_el2 );
+			hyp->irq_to_trap = 0;
+			hyp->faulty_elr_el2 = 0;
+			hyp->faulty_esr_el2 = 0;
+			force_sigsegv(SIGSEGV , hyp->tsk);
+		}
 #ifdef __GPIO__
 	// it is expected that the gpio would be 
 	// exported and configured from user space
