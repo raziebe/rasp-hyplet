@@ -11,6 +11,7 @@ OBJDUMP=/opt/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux
 
 # simple isr hyplet
 $CC   -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
+$CC   -I ../../../../../include fault_hyplet.c hyplet_utils.c -o fault_hyplet
 
 # timer usr hyplet
 $CC   -pthread -I ../../../../../include   -c test_isr_hyplet.c

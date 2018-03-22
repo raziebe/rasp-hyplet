@@ -45,6 +45,16 @@ static inline long cycles_us(void) {
 
 }
 
+static inline long cycles_us(void) {
+
+	struct timeval t;
+	
+	gettimeofday(&t,NULL);
+	
+	return t.tv_sec*1000000 + t.tv_usec;
+
+}
+
 static inline u64 cycles_to_ns()
 {
 	u64 t = cycles();

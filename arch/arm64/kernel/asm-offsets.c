@@ -176,6 +176,7 @@ int main(void)
   DEFINE(HYPLET_ARG2, offsetof(struct hyplet_vm, user_arg2));
   DEFINE(HYPLET_ARG3, offsetof(struct hyplet_vm, user_arg3));
   DEFINE(HYPLET_ARG4, offsetof(struct hyplet_vm, user_arg4));
-
+  DEFINE(HYPLET_FAULTY_ELR_EL2,offsetof(struct hyplet_vm, faulty_elr_el2));
+  DEFINE(HYPLET_FAULTY_ESR_EL2,offsetof(struct hyplet_vm, faulty_esr_el2));
   return 0;
 }

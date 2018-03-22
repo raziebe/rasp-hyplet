@@ -1,6 +1,4 @@
 #include <linux/linkage.h>
-#include <linux/irqchip/arm-gic.h>
-
 #include <asm/assembler.h>
 #include <asm/memory.h>
 #include <asm/asm-offsets.h>
@@ -10,8 +8,6 @@
 #include <asm/kvm_mmu.h>
 #include <asm/alternative.h>
 #include <asm/cpufeature.h>
-#include <linux/irqchip/arm-gic-v3.h>
-
 
 .text
 .pushsection	.hyp.text, "ax" // borrow  hyp.text
@@ -299,9 +295,13 @@ ENTRY(hyplet_run_user)
 
 	mrs	x0, tpidr_el2
 
-	ldr	x1, [x0, HYPLET_STACK]
-	msr	sp_el0,x1
-	ldr	x30,[x0, HYPLET_CODE]
+	mrs		x1, elr_el2
+	str		x1, [x0, HYPLET_ELR_EL2]
+
+	ldr		x1, [x0, HYPLET_STACK]
+	msr		sp_el0,x1
+	ldr		x30,[x0, HYPLET_CODE]
+
 
 /*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
 	mrs 	 x1, spsel
@@ -323,6 +323,37 @@ ENTRY(hyplet_run_user)
 	ret
 
 ENDPROC(hyplet_run_user)
+
+hyplet_abort_isr:
+//
+// reset stack back
+	mrs 	x1, spsel
+	orr 	w1, w1, #0x1
+	msr 	spsel,x1
+	msr 	cntvoff_el2, xzr
+
+// force El1h
+	mrs		x1, spsr_el2
+	and		w1, w1, 0xFFFFFFF0
+	mov		x2, 0x5
+	orr		x1, x1, x2
+	msr		spsr_el2,x1
+
+	mrs		x0, tpidr_el2
+	mrs		x1,elr_el2
+	str		x1, [x0, HYPLET_FAULTY_ELR_EL2]
+	mrs		x1,esr_el2
+	str		x1,[x0, HYPLET_FAULTY_ESR_EL2]
+// restore position
+	ldr 	x1,[x0, HYPLET_ELR_EL2]
+	msr		elr_el2,x1
+
+	pop_registers
+
+	pop	lr, xzr
+
+	eret
+ENDPROC(hyplet_abort_isr)
 
 ENTRY(hyplet_on)
 
@@ -350,14 +381,16 @@ ENTRY(hyplet_on)
 	eret
 ENDPROC(hyplet_on)
 
+
+
 .align 11
 ENTRY(__hyplet_vectors)
-		invalid_vector	EL2_sync,#1                        //Current EL with SP0
+	ventry		hyplet_abort_isr
         invalid_vector  EL2_irq_invalid,#2                 // IRQ EL2t
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t
 
-        invalid_vector  ELx_sync, #5 	// Current EL with SPx
+        ventry  hyplet_abort_isr	// Current EL with SPx
         invalid_vector  EL2_irq_invalidELSpx,#6                 // IRQ EL2h
         invalid_vector  EL2_fiq_invalidELSpx,#7                 // FIQ EL2h
         invalid_vector  EL2_error_invalidELspx,#8               // Error EL2h
