@@ -22,10 +22,11 @@ int dropped = 0;
 long* hist = NULL;
 long* hist_neg = NULL;
 int hist_size	= 10000;
+int offset_ns = 0;
 
 #define abs(x) ((x)<0 ? -(x) : (x))
 #define TICK_US 1000LL
-#define TICK_NS 998000LL // tick might be early
+#define TICK_NS 1000000LL // tick might be early
 
 /*
  * Implemented as timer0 hyplet
@@ -37,10 +38,10 @@ long isr_user_hyplet(void)
 	s64 ts = 0;
 
 	ts = cycles_to_ns();
-	if (ts < next_ts){
+	if (ts < next_ts)
 		return 0;
-	}
-	next_ts = ts + TICK_NS;
+
+	next_ts = ts + TICK_NS - offset_ns;
 	if (prev_ts != 0) {
 		dt = ts - prev_ts;
 		prev_ts = ts;
@@ -65,8 +66,6 @@ long isr_user_hyplet(void)
 	}
 hyplet_out:
 	count++;
-	if (times_offset <= 1)
-		next_ts = ts + TICK_NS;
 	return 0;
 }
 
@@ -74,7 +73,7 @@ int take_options(int argc, char *argv[])
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "l:i:a")) != -1) {
+	while ((opt = getopt(argc, argv, "l:o:i:a")) != -1) {
 		switch (opt) {
 		case 'i':
 			irq = atoi(optarg);
@@ -84,6 +83,9 @@ int take_options(int argc, char *argv[])
 			break;
 		case 'a':
 			irq =  HYPLET_IMP_TIMER;
+			break;
+		case 'o':
+			offset_ns = atoi(optarg);
 			break;
 		default:	/* '?' */
 			fprintf(stderr,
@@ -116,6 +118,8 @@ int hyplet_isr_start(void)
 
 	memset(stack_addr, 0x00, stack_size);
 
+	printf("TICK_NS %lld at %lld offset %lld\n",
+		TICK_NS,cycles_to_ns(), offset_ns);
 // create the heap
 	heap_sz = sizeof(long) * hist_size;
 	hist = malloc(heap_sz);

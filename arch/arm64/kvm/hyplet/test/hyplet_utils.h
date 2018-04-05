@@ -48,7 +48,7 @@ static inline long cycles_us(void) {
 static inline u64 cycles_to_ns()
 {
 	u64 t = cycles();
-	return t * 52;
+	return t * 52.083;
 }
 
 static inline long cntvoff_el2(void)
