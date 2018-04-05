@@ -14,9 +14,9 @@ $CC   -I ../../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
 $CC   -I ../../../../../include fault_hyplet.c hyplet_utils.c -o fault_hyplet
 
 # timer usr hyplet
-$CC   -pthread -I ../../../../../include   -c test_isr_hyplet.c
+$CC   -pthread -I ../../../../../include  -c test_isr_hyplet.c
 $CC   -pthread -I ../../../../../include  -c  hyplet_utils.c 
-$CC   -pthread -I ../../../../../include   -c main_test_hyplet.c
+$CC   -pthread -I ../../../../../include  -c main_test_hyplet.c
 $CC   -pthread main_test_hyplet.o test_isr_hyplet.o hyplet_utils.o -o  test_hyplet
 
 

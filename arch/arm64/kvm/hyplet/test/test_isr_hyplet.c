@@ -38,19 +38,23 @@ long isr_user_hyplet(void)
 	s64 ts = 0;
 
 	ts = cycles_to_ns();
-	if (ts < next_ts)
-		return 0;
-
-	next_ts = ts + TICK_NS - offset_ns;
-	if (prev_ts != 0) {
-		dt = ts - prev_ts;
-		prev_ts = ts;
-	} else{
-		prev_ts = ts;
+	if (ts < next_ts){
 		return 0;
 	}
-/* calc histogram  */
-	times_offset = (dt - TICK_NS)/1000;
+
+	if (prev_ts != 0) {
+		dt = ts - prev_ts;
+		next_ts = ts + TICK_NS - offset_ns + (TICK_NS-dt);
+		prev_ts = ts;
+	  } else{
+		prev_ts = ts;
+		next_ts = ts;
+		return 0;
+	}
+/*
+ * calc histogram  
+*/
+	times_offset = (TICK_NS - dt)/1000;
 	if (times_offset >= 0){
 		if (times_offset < hist_size)
 			hist[times_offset]++;
