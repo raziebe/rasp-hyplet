@@ -3,7 +3,7 @@
 # This script compiles and links and the binary
 # We do some elf parsing here because we need to know the 
 # hyplet size in advance.
-# kpartx -a opt/truly/linaro_fvp/armv8.img
+# sudo kartx -a /opt/truly/linaro_fvp/armv8.img
 #
 CC=/opt//gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc 
 READELF=/opt/gcc-linaro-4.9-2015.02-3-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-readelf

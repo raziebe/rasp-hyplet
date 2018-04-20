@@ -24,15 +24,23 @@
 int irq = 0;
 int some_global = 0;
 
+struct kernel_ops {
+	int (*print)(const char *fmt, ...);
+};
+
+typedef int (*kprint)(const char *fmt, ...);
 /*
  * This code is executed in an hyplet context
  * The attribute is only used to caluclated the exact size of the function.
  */
-long user_hyplet(void *opaque)
+long user_hyplet(kprint pr)
 {
 	some_global++;
-}
 
+	if (CurrentEL() < EL2)
+		pr("hello from EL%d  ) %d\n", CurrentEL(), some_global);
+	return some_global;
+}
 
 static int hyplet_start(void)
 {
@@ -60,7 +68,7 @@ static int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_set_callback(user_hyplet)) {
+	if (hyplet_set_callback((void*)user_hyplet)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
@@ -79,17 +87,17 @@ static int hyplet_start(void)
 */
 int main(int argc, char *argv[])
 {
-	int rc;
+    int rc;
 
     if (argc <= 1 ){
         puts("hyplet: must supply an irq , "
                         "please look in /proc/interrupts\n");
         return -1;
     }
-
+    printf("FFFFFFFFFFFFFFFFF\n");
     irq = atoi(argv[1]);
     hyplet_start();
-    printf("Waiting for irq %d for 20 seconds\n",irq);
-    sleep(20);
+    printf("Waiting for irq %d for 10 seconds\n",irq);
+    sleep(10);
     printf("some global %d\n",some_global);
 }

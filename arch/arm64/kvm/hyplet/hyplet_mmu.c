@@ -7,12 +7,158 @@
 #include <asm/cacheflush.h>
 #include <linux/list.h>
 #include <linux/delay.h>
-
+#include <linux/highmem.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
+#include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
+#include <linux/mman.h>
+#include <linux/kvm_host.h>
+#include <linux/io.h>
+#include <linux/hugetlb.h>
+#include <trace/events/kvm.h>
+#include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
+#include <asm/kvm_arm.h>
+#include <asm/kvm_mmu.h>
+#include <asm/kvm_mmio.h>
+#include <asm/kvm_asm.h>
+#include <asm/kvm_emulate.h>
 
 extern pgd_t *hyp_pgd;
+/*
+static pte_t* get_pte(unsigned long address)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pte_t *pte;
+	pmd_t *pmd;
 
+	pgd = pgd_offset(current->active_mm, address);
+	if (pgd_none(*pgd) || unlikely(pgd_bad(*pgd)))
+			return NULL;
+
+	pud = pud_offset(pgd, address);
+	if (pud_none(*pud))
+			return NULL;
+
+	if (unlikely(pud_bad(*pud)))
+			return NULL;
+
+	pmd = pmd_offset(pud, address);
+	if (pmd_none(*pmd))
+			return NULL;
+
+	if (unlikely(pmd_bad(*pmd)))
+			return NULL;
+
+	pte = pte_offset_map(pmd, address);
+	if (!pte_present(*pte)) {
+			return NULL;
+	}
+
+	return pte;
+}
+*/
+
+#define EXE_ENABLE_MASK 0xFFDFFFFFFFFFFFFFLL
+
+void dump_access_perms_block(unsigned long val)
+{
+	unsigned long ap;
+	unsigned long pxn;
+	unsigned long uxn;
+
+    ap =  (val & 0xc0) >> 6;
+    pxn = val & ~0xFFDFFFFFFFFFFFFFLL;
+    uxn = val & ~0xFFBFFFFFFFFFFFFFLL;
+
+    printk("block: val=%lx \n"
+    		"uxn=%lx pxn=%lx ap=%lx\n"
+    		,val, uxn, pxn,ap);
+}
+
+/*
+ * check hierarchical control access. page 2164.
+ */
+int  dump_access_perms_table(char *l,u64 val)
+{
+	long ap;
+	long pxn;
+	long unx;
+
+    ap =  val & 0x6000000000000000LL;
+    pxn = val & 0x0800000000000000LL;
+    unx = val & 0x1000000000000000LL;
+
+    printk("%s: val=%llx \n"
+    		"unx=%lx pxn=%lx ap=%lx\n"
+    		, l,val, unx, pxn,ap);
+
+    if (unx > 0)
+    		return 1;
+    return 0;
+}
+
+struct kernel_ops {
+        int (*print)(const char *fmt, ...);
+};
+
+static struct kernel_ops kops;
+// Memory attribute fields in the VMSAv8-64 translation table format descriptors
+int enable_el1_access(long address)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pte_t *pte;
+	pmd_t *pmd;
+	unsigned long val;
+	unsigned long pfn;
+
+	pgd = pgd_offset_gate(current->active_mm, address);
+	if (pgd_none(*pgd) || pgd_bad(*pgd))
+			return -1;
+
+	if ( dump_access_perms_table("pgd", pgd_val(*pgd)) ){
+		printk("pxn enabled on pgd\n");
+	}
+
+	pud = pud_offset(pgd, address);
+	if (pud_none(*pud) | pud_bad(*pud))
+			return -1;
+
+	if (dump_access_perms_table("pud", pud_val(*pud))){
+		printk("pxn enabled on pud\n");
+	}
+
+	pmd = pmd_offset(pud, address);
+	if (pmd_none(*pmd) | pmd_bad(*pmd))
+			return -1;
+
+	if ( dump_access_perms_table("pmd", pmd_val(*pmd)) ){
+		val = (long)pmd_val(pmd) & ~(0x0800000000000000LL);
+		set_pmd(pmd, val);
+	}
+
+	pte = pte_offset_map(pmd, address);
+	if (!pte_present(*pte)) {
+			return -1;
+	}
+
+	pfn = pte_pfn(*pte);
+	val = pte_val(*pte);
+	dump_access_perms_block(val);
+	flush_cache_page(current->active_mm->mmap, address,pfn);
+	set_pte(pte, pte_val(*pte) & EXE_ENABLE_MASK);
+	flush_tlb_page(current->active_mm->mmap, address);
+	kops.print = printk;
+	{
+		kops.print("Testing hyplet from EL1...\n");
+		call_user(address, printk);
+	}
+
+	return 0;
+}
 
 int create_hyp_user_mappings(long _from, long _to)
 {

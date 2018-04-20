@@ -119,3 +119,13 @@ int hyplet_rpc_set(void *user_hyplet,int func_id)
 	}
 	return 0;
 }
+
+// currentEL is accessible from EL1 
+int CurrentEL(void)
+{
+	long val;
+
+	asm ("mrs   %0, CurrentEL "  : "=r" (val) );
+	return ( (val & 0xc ) >> 2); 
+}
+

@@ -143,6 +143,8 @@ int hyplet_set_rpc(struct hyplet_ctrl* hplt)
 	return 0;
 }
 
+
+
 int hyplet_ctl(unsigned long arg)
 {
 	struct hyplet_vm *hyp = hyplet_get_vm();
@@ -176,12 +178,16 @@ int hyplet_ctl(unsigned long arg)
 				break;
 
 		case HYPLET_SET_CALLBACK:
+
 				rc = hyplet_check_mapped((void *)&hplt.__action);
 				if (rc == 0) {
 					hyplet_info("Warning: Hyplet was not mapped\n");
 				}
+				enable_el1_access(hplt.__action.addr.addr);
 				hyp->user_hyplet_code = hplt.__action.addr.addr;
+
 				break;
+
 		case HYPLET_TRAP_IRQ:
 				return hyplet_trap_irq(hplt.__action.irq);
 

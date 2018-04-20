@@ -1,22 +1,9 @@
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/highmem.h>
 #include <linux/compiler.h>
 #include <linux/linkage.h>
-
-#include <linux/init.h>
 #include <asm/sections.h>
 #include <asm/page.h>
-#include <linux/vmalloc.h>
-#include <asm/fixmap.h>
-#include <asm/memory.h>
-#include <linux/irqchip.h>
-#include <linux/irqchip/arm-gic-common.h>
-#include <linux/irqchip/arm-gic-v3.h>
-#include <asm/arch_gicv3.h>
-#include <linux/irq.h>
-#include <linux/irqdesc.h>
-
 #include <linux/delay.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
@@ -56,12 +43,14 @@ int hyplet_untrap_irq(int irq)
 	hyplet_reset(current);
 	return 0;
 }
-//#define __GPIO__
+
+#define __GPIO__
 
 #ifdef __GPIO__
 #include <linux/gpio.h>
 int gpio = 475; // the gpio we toggle
 static int toggle = 0;
+#define TOGGLE_GPIO	0x0
 #endif
 
 int hyplet_run(int irq)
@@ -75,7 +64,12 @@ int hyplet_run(int irq)
 	if (irq == hyp->irq_to_trap
 			|| hyp->irq_to_trap ==  IRQ_TRAP_ALL) {
 
-		hyplet_call_hyp(hyplet_run_user);
+#ifdef __GPIO__
+		long rc;
+		rc = 
+#endif		
+			hyplet_call_hyp(hyplet_run_user);
+
 		if (hyp->faulty_elr_el2){
 			printk("hyplet isr abort elr_el2 0x%lx esr_el2=%lx\n",
 					hyp->faulty_elr_el2 , hyp->faulty_esr_el2 );
@@ -85,12 +79,14 @@ int hyplet_run(int irq)
 			force_sigsegv(SIGSEGV , hyp->tsk);
 		}
 #ifdef __GPIO__
-	// it is expected that the gpio would be 
-	// exported and configured from user space
-	gpio_set_value(gpio, toggle);
-	toggle = !toggle;
+	if (rc == TOGGLE_GPIO) {
+		// it is expected that the gpio would be 
+		// exported and configured from user space
+		gpio_set_value(gpio, toggle);
+		toggle = !toggle;
+	}
 #endif
 	}
-	return 0; // TODO
+	return 0;
 }
 

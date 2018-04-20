@@ -282,6 +282,31 @@ ENTRY(hyplet_trap_off)
 	ret
 ENDPROC(hyplet_trap_off)
 
+/* 
+ * x0 = address of function
+ * x1,,x2... any other arguments
+*/
+ENTRY(call_user)
+
+	push x30,x0
+	push x1,x2
+	push x3,x4
+
+	mov  x30,x0	// function address
+	mov  x0,x1
+	mov  x1,x2
+	mov  x2,x3
+	mov  x3,x4
+	// .... shuffle as much you wish
+	blr  x30
+
+	pop  x3,x4
+	pop  x1,x2
+	pop  x30,x0
+
+	ret
+ENDPROC(call_user)
+
 /*
  *	Executing ISR hyplet
 */

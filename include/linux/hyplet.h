@@ -153,8 +153,9 @@ int 		hyplet_imp_timer(void);
 void 		hyplet_trap_on(void);
 void 		hyplet_trap_off(void);
 int 		hyplet_check_mapped(void *action);
-int		hyplet_map_user(void);
-
+int			hyplet_map_user(void);
+long		call_user(long user_function,...);
+int 		enable_el1_access(long _from);
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 extern int __create_hyp_mappings(pgd_t *pgdp,

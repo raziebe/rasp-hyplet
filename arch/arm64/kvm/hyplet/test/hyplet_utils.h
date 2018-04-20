@@ -5,6 +5,11 @@ typedef unsigned long long u64;
 typedef signed long long s64;
 static const int arm_arch_timer_reread = 1;
 
+#define	EL3	3
+#define EL2	2
+#define EL1	1
+#define EL0	0 
+
 #define cycles_to_nano(val) (val * 52)
 
 /* QorIQ errata workarounds */
