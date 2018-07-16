@@ -8,7 +8,7 @@
 
 #include <linux/hyplet_user.h>
 
-const int SYSCALL_HYPLET  = 285;
+const int SYSCALL_HYPLET  = 278;
 
 int hyplet_ctl(int cmd,struct hyplet_ctrl *hplt)
 {
