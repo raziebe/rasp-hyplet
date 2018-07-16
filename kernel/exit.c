@@ -467,6 +467,10 @@ static void exit_mm(struct task_struct *tsk)
 {
 	struct mm_struct *mm = tsk->mm;
 	struct core_state *core_state;
+        void tp_handler_exit(struct task_struct *tsk);
+ 
+        tp_handler_exit(tsk);
+
 
 	mm_release(tsk, mm);
 	if (!mm)

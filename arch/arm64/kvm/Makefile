@@ -3,13 +3,8 @@
 #
 
 ccflags-y += -Iarch/arm64/kvm
-CFLAGS_arm.o := -I.
+CFLAGS_arm.o := -I. -D__TRULY__
 CFLAGS_mmu.o := -I.
-
-ifeq ($(CONFIG_HYPLET), y)
-CFLAGS_arm.o +=  -D__HYPLET__
-CFLAGS_mmu.o +=  -D__HYPLET__
-endif
 
 KVM=../../../virt/kvm
 ARM=../../../arch/arm/kvm
@@ -33,4 +28,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
 kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
 
-obj-$(CONFIG_HYPLET)	+= hyplet/
+obj-$(CONFIG_TRULY_PROTECT)		+= truly/

@@ -998,9 +998,9 @@ long kvm_arch_vm_ioctl(struct file *filp,
 
 static unsigned long get_hyp_vector(void)
 {
-#ifdef __HYPLET__
-	hyplet_info("Assign Hyplet vector\n");
-	return (unsigned long) __hyplet_vectors;
+#ifdef __TRULY__
+	hyplet_info("Assign Truly vector\n");
+	return (unsigned long) __truly_vectors;
 #else
 	return (unsigned long)__kvm_hyp_vector;
 #endif
@@ -1024,11 +1024,10 @@ static void cpu_init_hyp_mode(void *dummy)
 
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 
-#ifdef __HYPLET__
-	hyplet_setup();
+#ifdef __TRULY__
+	tp_run_vm(NULL);
 	return;
 #endif
-
 	kvm_arm_init_debug();
 }
 

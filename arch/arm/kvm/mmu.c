@@ -30,8 +30,8 @@
 #include <asm/kvm_emulate.h>
 
 #include "trace.h"
-#ifdef __HYPLET__
-#include <linux/hyplet.h>
+#ifdef __TRULY__
+#include <linux/truly.h>
 #endif
 
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
@@ -223,7 +223,9 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 			/* No need to invalidate the cache for device mappings */
 			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
 				kvm_flush_dcache_pte(old_pte);
-			hyplet_clear_cache(pte, sizeof(pte_t));
+#ifdef __TRULY__
+			tp_clear_cache(pte, sizeof(pte_t));
+#endif
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -252,6 +254,8 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
 
 				put_page(virt_to_page(pmd));
 			} else {
+				pmd_t old_pmd = *pmd;
+				kvm_flush_dcache_pmd(old_pmd);
 				unmap_ptes(kvm, pmd, addr, next);
 			}
 		}
@@ -544,9 +548,14 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-void hyplet_user_unmap(unsigned long umem)
+
+void hyp_user_unmap(unsigned long umem,int size,int user)
 {
-        unmap_range(NULL, hyp_pgd, umem, PAGE_SIZE);
+       int sz_page = PAGE_ALIGN(size);
+       if (user)
+                       unmap_range(NULL, hyp_pgd, umem, sz_page);
+       else
+                       unmap_range(NULL, hyp_pgd, KERN_TO_HYP(umem) , sz_page);
 }
 
 int __create_hyp_mappings(pgd_t *pgdp,
