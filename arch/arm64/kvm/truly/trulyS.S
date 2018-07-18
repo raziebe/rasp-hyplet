@@ -133,44 +133,35 @@ BRK_EXCEPTION:
 	eret
 
 SAVE_LR:
-	/*
-	* The exception code take place many times,
-	* We must make sure we fill the caller address only once
-    */
-	ldr x2,[x0, #TP_FIRST_LR]
-	cmp x2,#0
+	//
+	// The exception code take place many times,
+	// We must make sure we fill the caller address only once
+    //
+	ldr x3,[x0, #TP_FIRST_LR]
+	cmp x3,#0
 	b.ne NOT_FIRST
-	str x30,[x0, #TP_FIRST_LR]	/* save the caller return address */
-// store context
-	mrs x2, tpidr_el0
-	str x2,[x0,#TP_TPIDR_EL0]
+	str x30,[x0, #TP_FIRST_LR]	// save the caller return address
 
 NOT_FIRST:
 
-	mrs x2, elr_el2
+	mrs x2,elr_el2
 	str x2,[x0, #TP_ELR_EL2]
-
-	pop	x2, x3
-	pop	x0, x1
 
 	save_registers
 
-	mrs	x0, tpidr_el2
-	mrs x2, elr_el2
-	str x2, [x0, #TP_ELR_EL2]
-
 	ldr x1,=truly_decrypt
 	kern_hyp_va x1
+
 	blr x1
 	bl pad_invalidate
 
-	// now return registers to the state they were when
-	// we entered
 	restore_registers
+	pop	x2, x3
+	pop	x0, x1
 
 	msr cntvoff_el2,x1  //<-- save x1
 
-//	EL2t. Switch stacks
+//	force stack to el0
 	mrs x1, spsel
 	and w1,w1,#0xFFFFFFFE
 	msr spsel,x1
@@ -180,19 +171,49 @@ NOT_FIRST:
 
 	msr cntvoff_el2,xzr
 
-	blr x30	// Execute decrypted in EL2
-//
-// restore x30
-//
-	msr  cntvoff_el2,x0
-	mrs	 x0, tpidr_el2
-	ldr  x30,[x0, #TP_FIRST_LR]
-	str  xzr,[x0, #TP_FIRST_LR]
-	str  xzr,[x0, #TP_SAVE_CMD]
-	mrs x0,cntvoff_el2
-    msr cntvoff_el2,xzr
+	blr x30
+	// Execute decrypted in EL2  and then return to next command because of the blr call.
 
-	ret
+	// User called ret.
+	// Return from the decrypted routine and then return to the
+	// reconstruced x30 as elr_el2
+
+	// first pad back the code
+	save_registers
+	mrs	x0,tpidr_el2
+	mov x1,#0x0
+	str x1,[x0, #TP_SAVE_CMD]
+	ldr x1,=truly_pad
+	kern_hyp_va x1
+	blr x1
+	bl pad_invalidate
+
+	restore_registers
+	//
+	push x0, x1
+	mrs	x0,tpidr_el2
+	// reconstrcted caller
+	ldr x30,[x0, #TP_FIRST_LR]
+	msr  elr_el2,x30 // we eret, so we must fix the pc in EL0
+	str xzr,[x0, #TP_FIRST_LR]
+
+	pop x0,x1
+
+	msr cntvoff_el2 ,x1   //<-- save x1
+	//	force stack back to elX
+	mrs x1, spsel
+	orr w1,w1,#0x1
+	msr spsel,x1
+
+	mrs  x1,spsr_el2
+	and w1,w1,#0xFFFFFFF0
+	msr spsr_el2,x1
+
+	mrs x1,cntvoff_el2 // <-- restore x1
+	msr cntvoff_el2,xzr
+
+	isb
+	eret
 ENDPROC(el1_trap)
 
 ENTRY(pad_invalidate)

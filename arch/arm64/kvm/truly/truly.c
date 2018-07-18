@@ -231,7 +231,7 @@ int truly_init(void)
 		mutex_init(&tv->sync);
 	}
 
-	tp_err("TrulyProtect Version rc-1.16\n");
+	tp_err("TrulyProtect Version rc-1.17\n");
 	init_procfs();
 	return 0;
 }
