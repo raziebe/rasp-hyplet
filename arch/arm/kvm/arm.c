@@ -44,8 +44,10 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
 #include <asm/kvm_psci.h>
-#include <linux/hyplet.h>
 
+#ifdef __TRULY__
+#include <linux/truly.h>
+#endif
 
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
@@ -999,7 +1001,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
 static unsigned long get_hyp_vector(void)
 {
 #ifdef __TRULY__
-	hyplet_info("Assign Truly vector\n");
+	tp_info("Assign Truly vector\n");
 	return (unsigned long) __truly_vectors;
 #else
 	return (unsigned long)__kvm_hyp_vector;
@@ -1037,7 +1039,7 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_STARTING:
 	case CPU_STARTING_FROZEN:
-		hyplet_info("%lx %lx" ,
+		tp_info("%lx %lx" ,
 				(long) __hyp_get_vectors() ,
 				(long) hyp_default_vectors);
 
@@ -1160,8 +1162,9 @@ static int init_hyp_mode(void)
 			goto out_free_context;
 		}
 	}
-#ifdef __HYPLET__
-	hyplet_init();
+
+#ifdef __TRULY__
+	truly_init();
 	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
 	return 0;
 #endif

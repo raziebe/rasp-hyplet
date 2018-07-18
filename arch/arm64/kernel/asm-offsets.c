@@ -29,7 +29,7 @@
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
 
-#include "linux/hyplet.h"
+#include "linux/truly.h"
 
 int main(void)
 {
@@ -166,14 +166,23 @@ int main(void)
   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
 #endif
 
-  DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
-  DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
-  DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  user_hyplet_code ));
-  DEFINE(HYPLET_CNT, offsetof(struct hyplet_vm, int_cnt));
+  DEFINE(TP_HCR_EL2, offsetof(struct truly_vm,  hcr_el2));
+  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
+  DEFINE(TP_ESR_EL2, offsetof(struct truly_vm,  esr_el2));
+  DEFINE(TP_TPIDR_EL0 , offsetof(struct truly_vm,  tpidr_el0));
 
-  DEFINE(HYPLET_ELR_EL2, offsetof(struct hyplet_vm, elr_el2));
-  DEFINE(HYPLET_SP_EL0, offsetof(struct hyplet_vm, sp_el0));
-  DEFINE(HYPLET_VAL, offsetof(struct hyplet_vm, user_val));
-  DEFINE(HYPLET_USER_HYPLET_ID, offsetof(struct hyplet_vm, user_hyplet_id));
+  DEFINE(TP_FAR_EL2, offsetof(struct truly_vm,  far_el2));
+  DEFINE(TP_HSTR_EL2 , offsetof(struct truly_vm,  hstr_el2));
+  DEFINE(TP_FIRST_LR , offsetof(struct truly_vm,  first_lr));
+  DEFINE(TP_MAIR_EL2 , offsetof(struct truly_vm, mair_el2) );
+  DEFINE(TP_SAVE_CMD , offsetof(struct truly_vm,  save_cmd));
+  DEFINE(TP_VTTBR_EL2 , offsetof(struct truly_vm,  vttbr_el2));
+  DEFINE(TP_VTCR_EL2 , offsetof(struct truly_vm,  vtcr_el2));
+  DEFINE(TP_MDCR_EL2 , offsetof(struct truly_vm,  mdcr_el2));
+  DEFINE(TP_PGD, offsetof(struct truly_vm, protected_pgd));
+  DEFINE(TP_ENC, offsetof(struct truly_vm, enc));
+  DEFINE(TP_SCTLR_EL2, offsetof(struct truly_vm, sctlr_el2));
+  DEFINE(TP_ENC_SIZE , offsetof(struct encrypted_segment, size));
+  DEFINE(TP_PAD_DATA , offsetof(struct encrypted_segment, pad_data));
   return 0;
 }

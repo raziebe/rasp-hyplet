@@ -607,28 +607,6 @@ static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
 	}
 }
 
-unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
-{
-	unsigned long pfn;
-	struct page *pages[1];
-	int nr;
-
-	nr = get_user_pages(current,
-	                     current->mm,
-	                    uaddr,
-	                      1, 0,     /* write */
-	                      1,  /* force */
-	                    (struct page **)&pages, 0);
-	if (nr <= 0){
-	       printk("hyplet: failed to get user pages %p\n",(void *)uaddr);
-	       return 0x00;
-	}
-	pfn = page_to_pfn(pages[0]);
-	page_cache_release(pages[0]);
-	return pfn;
-}
-
-
 /**
  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
  * @from:	The virtual kernel start address of the range
