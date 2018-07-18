@@ -1,8 +1,0 @@
-#
-#  Hyplet 
-#
-
-config HYPLET
-	bool "Hyplet"
-	---help---
-	Hyplets 
