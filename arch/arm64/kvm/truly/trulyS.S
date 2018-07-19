@@ -123,8 +123,9 @@ BRK_EXCEPTION:
 	mrs	x0,tpidr_el2
 	ldr x3,[x0, #TP_PGD]
 	cmp x3, #0
-	b.ne SAVE_LR
+//	b.ne SAVE_LR
 	mrs x3,elr_el2
+	msr mdcr_el2, xzr // first test if we even enter the hypervisor
 	add x3,x3,#4
 	msr elr_el2,x3
 
