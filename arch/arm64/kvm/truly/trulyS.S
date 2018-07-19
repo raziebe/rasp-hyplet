@@ -1,6 +1,4 @@
 #include <linux/linkage.h>
-#include <linux/irqchip/arm-gic.h>
-
 #include <asm/assembler.h>
 #include <asm/memory.h>
 #include <asm/asm-offsets.h>
@@ -8,6 +6,11 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_mmu.h>
+
+#define HYP_PAGE_OFFSET_SHIFT   VA_BITS
+#define HYP_PAGE_OFFSET_MASK    ((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+#define HYP_PAGE_OFFSET         (PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
+#define KERN_TO_HYP(kva)        ((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 
 .text
 .pushsection	.hyp.text, "ax"
@@ -19,6 +22,14 @@
 	mov	x6, \num
         b __truly_panic
 ENDPROC(\label)
+.endm
+
+.macro	push, xreg1, xreg2
+	stp	\xreg1, \xreg2, [sp, #-16]!
+.endm
+
+.macro	pop, xreg1, xreg2
+	ldp	\xreg1, \xreg2, [sp], #16
 .endm
 
 

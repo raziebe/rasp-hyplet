@@ -31,6 +31,8 @@
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
 #include <linux/arm-smccc.h>
+#include <linux/truly.h>
+
 
 int main(void)
 {

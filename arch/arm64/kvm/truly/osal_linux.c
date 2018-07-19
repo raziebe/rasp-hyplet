@@ -95,12 +95,18 @@ size_t get_cur_ppid(void)
     return current->real_parent != NULL ? current->real_parent->pid : 0UL;
 }
 
+/*
+int vfs_getattr(const struct path *path, struct kstat *stat,
+		u32 request_mask, unsigned int query_flags)
+*/
 static unsigned long get_file_size(const char* path)
 {
 	struct path p;
 	struct kstat ks;
 	kern_path(path, 0, &p);
-	vfs_getattr(&p, &ks);
+
+	vfs_getattr(&p, &ks, STATX_BASIC_STATS,
+	    AT_STATX_SYNC_AS_STAT);
 
 	return ks.size;
 }

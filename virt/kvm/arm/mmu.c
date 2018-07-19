@@ -35,7 +35,7 @@
 #include "trace.h"
 
 static pgd_t *boot_hyp_pgd;
-static pgd_t *hyp_pgd;
+pgd_t *hyp_pgd;
 static pgd_t *merged_hyp_pgd;
 static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
 
@@ -479,7 +479,7 @@ static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
 		clear_hyp_pgd_entry(pgd);
 }
 
-static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
 {
 	pgd_t *pgd;
 	phys_addr_t addr = start, end = start + size;
@@ -623,7 +623,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 	return 0;
 }
 
-static int __create_hyp_mappings(pgd_t *pgdp,
+int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot)
 {

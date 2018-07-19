@@ -280,6 +280,7 @@ void tp_prepare_process(struct _IMAGE_FILE* image_file)
 }
 
 
+void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size);
 #define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
 extern int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
@@ -338,7 +339,7 @@ unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
 	       return 0x00;
 	}
 	pfn = page_to_pfn(pages[0]);
-	page_cache_release(pages[0]);
+	put_page(pages[0]);
 	return pfn;
 }
 
@@ -668,3 +669,16 @@ void make_vtcr_el2(struct truly_vm *tvm)
 	    (vtcr_el2_ps << VTCR_EL2_PS_BIT_SHIFT);
 
 }
+
+void hyp_user_unmap(unsigned long umem,int size,int user)
+{
+       int sz_page = PAGE_ALIGN(size);
+
+       if (user)
+            //unmap_range(NULL, hyp_pgd, umem, sz_page);
+   	    unmap_hyp_range(hyp_pgd, umem, sz_page);
+       else
+            // unmap_range(NULL, hyp_pgd, KERN_TO_HYP(umem) , sz_page);
+   	    unmap_hyp_range(hyp_pgd, KERN_TO_HYP(umem), sz_page);
+}
+

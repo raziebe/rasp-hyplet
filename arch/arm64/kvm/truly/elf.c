@@ -9,7 +9,7 @@
 #include <linux/path.h>
 #include <linux/mm_types.h>
 #include <linux/fs.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/elf.h>
 
 #include "elf.h"

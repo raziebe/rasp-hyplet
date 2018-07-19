@@ -54,5 +54,6 @@ config KVM_ARM_PMU
 	  virtual machines.
 
 source drivers/vhost/Kconfig
+source arch/arm64/kvm/truly/Kconfig
 
 endif # VIRTUALIZATION
