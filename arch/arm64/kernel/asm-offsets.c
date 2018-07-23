@@ -31,6 +31,8 @@
 #include <asm/vdso_datapage.h>
 #include <linux/kbuild.h>
 #include <linux/arm-smccc.h>
+#include <linux/truly.h>
+
 
 int main(void)
 {
@@ -154,5 +156,26 @@ int main(void)
   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
+
+// Truly Protect
+
+  DEFINE(TP_HCR_EL2, offsetof(struct truly_vm,  hcr_el2));
+  DEFINE(TP_ELR_EL2, offsetof(struct truly_vm,  elr_el2));
+  DEFINE(TP_ESR_EL2, offsetof(struct truly_vm,  esr_el2));
+  DEFINE(TP_TPIDR_EL0 , offsetof(struct truly_vm,  tpidr_el0));
+  DEFINE(TP_FAR_EL2, offsetof(struct truly_vm,  far_el2));
+  DEFINE(TP_HSTR_EL2 , offsetof(struct truly_vm,  hstr_el2));
+  DEFINE(TP_FIRST_LR , offsetof(struct truly_vm,  first_lr));
+  DEFINE(TP_MAIR_EL2 , offsetof(struct truly_vm, mair_el2) );
+  DEFINE(TP_SAVE_CMD , offsetof(struct truly_vm,  save_cmd));
+  DEFINE(TP_VTTBR_EL2 , offsetof(struct truly_vm,  vttbr_el2));
+  DEFINE(TP_VTCR_EL2 , offsetof(struct truly_vm,  vtcr_el2));
+  DEFINE(TP_MDCR_EL2 , offsetof(struct truly_vm,  mdcr_el2));
+  DEFINE(TP_PGD, offsetof(struct truly_vm, protected_pgd));
+  DEFINE(TP_ENC, offsetof(struct truly_vm, enc));
+  DEFINE(TP_SCTLR_EL2, offsetof(struct truly_vm, sctlr_el2));
+  DEFINE(TP_ENC_SIZE , offsetof(struct encrypted_segment, size));
+  DEFINE(TP_PAD_DATA , offsetof(struct encrypted_segment, pad_data));
+
   return 0;
 }

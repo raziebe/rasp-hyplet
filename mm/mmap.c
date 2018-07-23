@@ -2720,12 +2720,17 @@ int vm_munmap(unsigned long start, size_t len)
 {
 	int ret;
 	struct mm_struct *mm = current->mm;
-	LIST_HEAD(uf);
+	void tp_unmmap_region(unsigned long start, size_t len);
+	int tp_is_active_protected(void);
 
+	LIST_HEAD(uf);
+	
 	if (down_write_killable(&mm->mmap_sem))
 		return -EINTR;
 
 	ret = do_munmap(mm, start, len, &uf);
+        if (tp_is_active_protected())
+                tp_unmmap_region(start, len);
 	up_write(&mm->mmap_sem);
 	userfaultfd_unmap_complete(mm, &uf);
 	return ret;
