@@ -60,6 +60,13 @@ long truly_get_mfr(void)
 	return e;
 }
 
+long truly_get_sp_el0(void)
+{
+	long e = 0;
+    asm("mrs %0,sp_el0\n":"=r"(e));
+	return e;
+}
+
 /*
  * the page us using attr_ind 4
  */
@@ -80,7 +87,7 @@ void make_hstr_el2(struct truly_vm *tvm)
 
 void make_hcr_el2(struct truly_vm *tvm)
 {
-	tvm->hcr_el2 =   HCR_RW | HCR_VM ;// HCR_TRULY_FLAGS;
+	tvm->hcr_el2 =   HCR_RW ;//| HCR_VM ;// HCR_TRULY_FLAGS;
 }
 
 void make_mdcr_el2(struct truly_vm *tvm)

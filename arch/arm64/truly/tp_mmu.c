@@ -55,9 +55,10 @@ void tp_map_vmas(struct _IMAGE_FILE* image_file)
         	}
 
         	if (vma->vm_flags == VM_STACK_FLAGS) {
-        		map_user_space_data(
-        				(void *)(vma->vm_end - PAGE_SIZE),
-        				PAGE_SIZE, PAGE_HYP);
+        				tp_info("skip mapping of stack at %p\n",(void *)(vma->vm_end - PAGE_SIZE));
+        				//map_user_space_data(
+        					//	(void *)(vma->vm_end - PAGE_SIZE),
+								//PAGE_SIZE, PAGE_HYP);
         	}
         }
 }
@@ -90,35 +91,7 @@ void unmap_user_space_data(unsigned long umem,int size)
 	hyp_user_unmap(umem,  size, 1);
 	tp_debug("pid %d unmapped %lx \n", current->pid, umem);
 }
-/*
-int mmu_map_vma(unsigned long addr, struct truly_vm *tv)
-{
-	int size;
-    struct vm_area_struct* vma;
 
-    if (current->mm == NULL) {
-    	printk("Truly insane: no mm\n");
-    	return -1;
-    }
-
-    vma = current->mm->mmap;
-
-    if (is_addr_mapped(addr,tv)){
-    	tp_debug("%s %lx already mapped\n",__func__,addr);
-    	return 0;
-    }
-
-    for (;vma ; vma = vma->vm_next) {
-    	size = vma->vm_end  -vma->vm_start;
-    	if (!(addr >= vma->vm_start && addr <= vma->vm_end) ){
-    		continue;
-    	}
-    	map_user_space_data( (void *)vma->vm_start, size, PAGE_HYP);
-    	return 0;
-    }
-    return (-1);
-}
-*/
 int mmu_map_page(unsigned long addr, struct truly_vm *tv)
 {
     struct vm_area_struct* vma;
@@ -179,10 +152,8 @@ int is_addr_mapped(long addr,struct truly_vm *tv)
 	struct hyp_addr* tmp;
 
 	list_for_each_entry(tmp,  &tv->hyp_addr_lst,lst) {
-
 		long start = tmp->addr;
 		long end = tmp->addr + tmp->size;
-
 		if ( ( addr < end && addr >= start) )
 			return 1;
 	}
@@ -273,18 +244,13 @@ void tp_prepare_process(struct _IMAGE_FILE* image_file)
 			tvm->elr_el2 = 0;
 			tvm->far_el2 = 0;
 			tvm->first_lr = 0;
+			tvm->sp_el0_krn = truly_get_sp_el0();
+			tvm->sp_el0_usr = 0;
 			tvm->enc->seg[0] = tv->enc->seg[0];
 			mb();
 	}
 }
 
-
-void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size);
-#define PAGE_HYP_USER	( PROT_DEFAULT  | PTE_ATTRINDX(0) ) // not shared,
-extern int __create_hyp_mappings(pgd_t *pgdp,
-				 unsigned long start, unsigned long end,
-				 unsigned long pfn, pgprot_t prot);
-extern pgd_t *hyp_pgd;
 /**
  * create_hyp_user_mappings - duplicate a user virtual address range in Hyp mode
  * @from:	The virtual kernel start address of the range

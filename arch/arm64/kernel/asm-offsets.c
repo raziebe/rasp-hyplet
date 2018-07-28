@@ -176,6 +176,8 @@ int main(void)
   DEFINE(TP_SCTLR_EL2, offsetof(struct truly_vm, sctlr_el2));
   DEFINE(TP_ENC_SIZE , offsetof(struct encrypted_segment, size));
   DEFINE(TP_PAD_DATA , offsetof(struct encrypted_segment, pad_data));
+  DEFINE(TP_SP_EL0_KRN , offsetof(struct truly_vm, sp_el0_krn));
+  DEFINE(TP_SP_EL0_USR , offsetof(struct truly_vm, sp_el0_usr));
 
   return 0;
 }

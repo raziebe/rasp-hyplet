@@ -88,6 +88,7 @@
 
 #define __int8  char
 typedef unsigned __int8 UCHAR;
+extern pgd_t *hyp_pgd;
 
 enum { ECB=0, CBC=1, CFB=2 };
 enum { DEFAULT_BLOCK_SIZE=16 };
@@ -159,7 +160,8 @@ struct truly_vm {
 	unsigned long save_cmd;
 	unsigned long tpidr_el0;
 //
-//	unsigned long spsr_el2;
+	unsigned long sp_el0_usr;
+	unsigned long sp_el0_krn;
  	unsigned long tv_flags;
  	unsigned long copy_time;
 	unsigned long protected_pgd;
@@ -221,10 +223,12 @@ unsigned long tp_clear_cache(pte_t* addr,long size);
 void truly_map_tvm(void);
 unsigned long get_hyp_vector(void);
 long tp_call_hyp(void *hyper_func, ...);
+long truly_get_sp_el0(void);
+void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size);
+void el2_mmu_fault_th(void);
 
 
-static inline long cycles(void)
-{
+static inline long cycles(void){
         long cval;
         asm volatile ("mrs %0, cntvct_el0" : "=r" (cval));
         return cval;

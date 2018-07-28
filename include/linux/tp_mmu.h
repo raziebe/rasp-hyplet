@@ -23,6 +23,9 @@ int create_hyp_user_mappings(void *,void*,pgprot_t prot);
 void make_vtcr_el2(struct truly_vm *tvm);
 void tp_create_pg_tbl(void *cxt);
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr);
+int __create_hyp_mappings(pgd_t *pgdp,
+				 unsigned long start, unsigned long end,
+				 unsigned long pfn, pgprot_t prot);
 
 #define USER_TO_HYP(uva)	(uva)
 

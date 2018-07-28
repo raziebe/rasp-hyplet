@@ -59,7 +59,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
 
 unsigned long get_hyp_vector(void)
 {
-	tp_info("Assign Truly vector\n");
 	return (unsigned long)__truly_vectors;
 }
 
@@ -79,6 +78,7 @@ static void cpu_init_hyp_mode(void *discard)
 	boot_pgd_ptr = tp_mmu_get_boot_httbr();
 	hyp_stack_ptr = stack_page + PAGE_SIZE;
 	vector_ptr = get_hyp_vector();
+	tp_info("Assign Truly vector\n");
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 	tp_run_vm(NULL);
 	return;

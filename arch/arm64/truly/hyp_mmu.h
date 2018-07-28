@@ -41,6 +41,7 @@
 #include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
+#include <linux/highmem.h>
 
 
 
@@ -99,8 +100,9 @@ static inline bool tp_page_empty(void *ptr)
 
 static inline void tp_flush_dcache_pte(pte_t pte)
 {
-	struct page *page = pte_page(pte);
-	tp_flush_dcache_to_poc(page_address(page), PAGE_SIZE);
+	void *va = kmap_atomic(pte_page(pte));
+	tp_flush_dcache_to_poc(va, PAGE_SIZE);
+	kunmap_atomic(va);
 }
 
 static inline void tp_flush_dcache_pmd(pmd_t pmd)

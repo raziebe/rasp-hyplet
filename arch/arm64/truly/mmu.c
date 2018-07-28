@@ -56,10 +56,7 @@ static unsigned long hyp_idmap_start;
 static unsigned long hyp_idmap_end;
 static phys_addr_t hyp_idmap_vector;
 
-#define kvm_pgd_addr_end(addr, end)     pgd_addr_end(addr, end)
 #define tp_pud_addr_end(addr, end)     pud_addr_end(addr, end)
-#define kvm_pmd_addr_end(addr, end)     pmd_addr_end(addr, end)
-
 
 /*
 static void tp_flush_dcache_pte(pte_t pte)
@@ -216,12 +213,9 @@ static void unmap_puds( pgd_t *pgd,
 		if (!pud_none(*pud)) {
 			if (pud_huge(*pud)) {
 				pud_t old_pud = *pud;
-
 				pud_clear(pud);
 			//	kvm_tlb_flush_vmid_ipa(kvm, addr);
-
 				tp_flush_dcache_pud(old_pud);
-
 				put_page(virt_to_page(pud));
 			} else {
 				unmap_pmds( pud, addr, next);

@@ -31,6 +31,7 @@ int __hyp_text truly_is_protected(struct truly_vm *tv)
 void tp_reset_tvm(void)
 {
 	int cpu;
+
 	for_each_possible_cpu(cpu) {
 			struct truly_vm *tv = get_tvm_per_cpu(cpu);
 			tv->protected_pgd = 0;
@@ -40,7 +41,8 @@ void tp_reset_tvm(void)
 			tv->first_lr = 0;
 			tv->elr_el2  = 0;
 			tv->esr_el2  = 0;
-		//	tv->spsr_el2  = 0;
+			tv->sp_el0_usr  = 0;
+			tv->sp_el0_krn = 0;
 			tv->brk_count_el2 = 0;
 			memset(&tv->enc->seg[0], 0x00, sizeof(tv->enc->seg[0]));
 			mb();
