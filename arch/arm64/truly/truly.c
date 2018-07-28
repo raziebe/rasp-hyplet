@@ -74,9 +74,9 @@ void make_mair_el2(struct truly_vm *tvm)
 {
 	unsigned long mair_el2;
 
-	mair_el2 = tp_call_hyp(read_mair_el2);
-	tvm->mair_el2 = (mair_el2 & 0x000000FF00000000L ) | 0x000000FF00000000L; //
-	//tvm->mair_el2 = 0xFFFFFFFFFFFFFFFFL;
+	//mair_el2 = tp_call_hyp(read_mair_el2);
+	//tvm->mair_el2 = (mair_el2 & 0x000000FF00000000L ) | 0x000000FF00000000L; //
+	tvm->mair_el2 = 0xFFFFFFFFFFFFFFFFL;
  	tp_call_hyp(set_mair_el2, tvm->mair_el2);
 }
 

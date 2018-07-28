@@ -247,12 +247,11 @@ int el2_do_page_fault(unsigned long addr)
 {
 	char buf[4];
 
-//	if ( !copy_from_user(buf, (void *)addr, sizeof(buf)) ){
-	//	tp_err(" faulted user address %lx OK\n",addr);
-//	} else {
-	//	tp_err(" faulted user address %lx ERROR\n",addr);
-//	}
-
+	if (!copy_from_user(buf, (void *)addr, sizeof(buf))){
+		tp_err(" faulted user address %lx OK\n",addr);
+	    } else{
+		tp_err(" faulted user address %lx ERROR\n",addr);
+	}
 	el2_mmu_fault_th();
 	return 0;
 }

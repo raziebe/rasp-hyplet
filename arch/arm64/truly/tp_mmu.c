@@ -45,20 +45,21 @@ void tp_map_vmas(struct _IMAGE_FILE* image_file)
         for (;vma ; vma = vma->vm_next) {
 
         	if (is_addr_mapped(vma->vm_start, get_tvm())){
-        		tp_info("%s: %lx already mapped\n",
-        				__func__,vma->vm_start);
+        		tp_info("%lx already mapped\n",
+        				vma->vm_start);
         		continue;
         	}
+
         	if (vma->vm_flags & VM_EXEC) {
         		vma_map_hyp(vma, PAGE_HYP_RW_EXEC);
-                continue;
+                	continue;
         	}
 
         	if (vma->vm_flags == VM_STACK_FLAGS) {
-        				tp_info("skip mapping of stack at %p\n",(void *)(vma->vm_end - PAGE_SIZE));
-        				//map_user_space_data(
-        					//	(void *)(vma->vm_end - PAGE_SIZE),
-								//PAGE_SIZE, PAGE_HYP);
+        		tp_info("mapping of stack at %p\n",(void *)(vma->vm_end - PAGE_SIZE));
+        		map_user_space_data(
+        			(void *)(vma->vm_end - PAGE_SIZE),
+				PAGE_SIZE, PAGE_HYP);
         	}
         }
 }

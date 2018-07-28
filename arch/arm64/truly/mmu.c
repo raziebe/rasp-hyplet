@@ -161,7 +161,7 @@ static void unmap_ptes(pmd_t *pmd,
 			/* No need to invalidate the cache for device mappings */
 			if (pfn_valid(pte_pfn(old_pte)))
 				tp_flush_dcache_pte(old_pte);
-			tp_clear_cache(pte, sizeof(pte_t));
+			//tp_clear_cache(pte, sizeof(pte_t)); debug
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
