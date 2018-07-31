@@ -58,48 +58,10 @@ static phys_addr_t hyp_idmap_vector;
 
 #define tp_pud_addr_end(addr, end)     pud_addr_end(addr, end)
 
-/*
-static void tp_flush_dcache_pte(pte_t pte)
-{
-	void *va = kmap_atomic(pte_page(pte));
-
-	tp_flush_dcache_to_poc(va, PAGE_SIZE);
-
-	kunmap_atomic(va);
-}
-
-static inline void __tp_flush_dcache_pmd(pmd_t pmd)
-{
-	unsigned long size = PMD_SIZE;
-	unsigned long pfn = pmd_pfn(pmd);
-
-	while (size) {
-		void *va = kmap_atomic_pfn(pfn);
-
-		tp_flush_dcache_to_poc(va, PAGE_SIZE);
-
-		pfn++;
-		size -= PAGE_SIZE;
-
-		kunmap_atomic(va);
-	}
-}
-
-static void tp_flush_dcache_pmd(pmd_t pmd)
-{
-	__tp_flush_dcache_pmd(pmd);
-}
-*/
-//static bool kvm_is_device_pfn(unsigned long pfn)
-//{
-//	return !pfn_valid(pfn);
-//}
-
 static void clear_pgd_entry(pgd_t *pgd, phys_addr_t addr)
 {
 	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
 	pgd_clear(pgd);
-//	kvm_tlb_flush_vmid_ipa(kvm, addr);
 	pud_free(NULL, pud_table);
 	put_page(virt_to_page(pgd));
 }
@@ -109,7 +71,6 @@ static void clear_pud_entry(pud_t *pud, phys_addr_t addr)
 	pmd_t *pmd_table = pmd_offset(pud, 0);
 	VM_BUG_ON(pud_huge(*pud));
 	pud_clear(pud);
-//	kvm_tlb_flush_vmid_ipa(kvm, addr);
 	pmd_free(NULL, pmd_table);
 	put_page(virt_to_page(pud));
 }
@@ -119,31 +80,11 @@ static void clear_pmd_entry(pmd_t *pmd, phys_addr_t addr)
 	pte_t *pte_table = pte_offset_kernel(pmd, 0);
 	VM_BUG_ON(tp_pmd_huge(*pmd));
 	pmd_clear(pmd);
-//	kvm_tlb_flush_vmid_ipa(kvm, addr);
 	pte_free_kernel(NULL, pte_table);
 	put_page(virt_to_page(pmd));
 }
 
-/*
- * Unmapping vs dcache management:
- *
- * If a guest maps certain memory pages as uncached, all writes will
- * bypass the data cache and go directly to RAM.  However, the CPUs
- * can still speculate reads (not writes) and fill cache lines with
- * data.
- *
- * Those cache lines will be *clean* cache lines though, so a
- * clean+invalidate operation is equivalent to an invalidate
- * operation, because no cache lines are marked dirty.
- *
- * Those clean cache lines could be filled prior to an uncached write
- * by the guest, and the cache coherent IO subsystem would therefore
- * end up writing old data to disk.
- *
- * This is why right after unmapping a page/section and invalidating
- * the corresponding TLBs, we call kvm_flush_dcache_p*() to make sure
- * the IO subsystem will never hit in the cache.
- */
+
 static void unmap_ptes(pmd_t *pmd,
 		       phys_addr_t addr, phys_addr_t end)
 {
@@ -156,12 +97,9 @@ static void unmap_ptes(pmd_t *pmd,
 			pte_t old_pte = *pte;
 
 			tp_set_pte(pte, __pte(0));
-		//	kvm_tlb_flush_vmid_ipa(kvm, addr);
-
 			/* No need to invalidate the cache for device mappings */
 			if (pfn_valid(pte_pfn(old_pte)))
 				tp_flush_dcache_pte(old_pte);
-			//tp_clear_cache(pte, sizeof(pte_t)); debug
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -182,12 +120,8 @@ static void unmap_pmds(pud_t *pud,
 		if (!pmd_none(*pmd)) {
 			if (tp_pmd_huge(*pmd)) {
 				pmd_t old_pmd = *pmd;
-
 				pmd_clear(pmd);
-			//	kvm_tlb_flush_vmid_ipa(kvm, addr);
-
 				tp_flush_dcache_pmd(old_pmd);
-
 				put_page(virt_to_page(pmd));
 			} else {
 				pmd_t old_pmd = *pmd;
@@ -214,7 +148,6 @@ static void unmap_puds( pgd_t *pgd,
 			if (pud_huge(*pud)) {
 				pud_t old_pud = *pud;
 				pud_clear(pud);
-			//	kvm_tlb_flush_vmid_ipa(kvm, addr);
 				tp_flush_dcache_pud(old_pud);
 				put_page(virt_to_page(pud));
 			} else {
@@ -240,12 +173,6 @@ static void unmap_range(pgd_t *pgdp,
 		next = tp_pgd_addr_end(addr, end);
 		if (!pgd_none(*pgd))
 			unmap_puds(pgd, addr, next);
-		/*
-		 * If we are dealing with a large range in
-		 * stage2 table, release the kvm->mmu_lock
-		 * to prevent starvation and lockup detector
-		 * warnings.
-		 */
 	} while (pgd++, addr = next, addr != end);
 }
 

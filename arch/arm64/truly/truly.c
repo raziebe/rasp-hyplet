@@ -1,17 +1,9 @@
 #include <linux/module.h>
-#include <linux/linkage.h>
-#include <linux/init.h>
-#include <linux/gfp.h>
 #include <linux/highmem.h>
-#include <linux/compiler.h>
-#include <linux/linkage.h>
-#include <linux/linkage.h>
-#include <linux/init.h>
-#include <asm/sections.h>
-#include <linux/proc_fs.h>
+#include <linux/truly.h>
 #include <linux/slab.h>
-#include <asm/page.h>
-#include <linux/vmalloc.h>
+#include <linux/tp_mmu.h>
+#include <linux/proc_fs.h>
 #include "hyp_mmu.h"
 
 #define __TRULY_DEBUG__
@@ -39,31 +31,31 @@ long truly_get_elr_el1(void)
 {
 	long e;
 
-	asm("mrs  %0, elr_el1\n":"=r"(e));
+      asm("mrs  %0, elr_el1\n":"=r"(e));
 	return e;
 }
 
 void truly_set_sp_el1(long e)
 {
-	asm("msr  sp_el1,%0\n":"=r"(e));
+      asm("msr  sp_el1,%0\n":"=r"(e));
 }
 
 void truly_set_elr_el1(long e)
 {
-	asm("msr  elr_el1,%0\n":"=r"(e));
+      asm("msr  elr_el1,%0\n":"=r"(e));
 }
 
 long truly_get_mfr(void)
 {
 	long e = 0;
-	asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
+    asm("mrs %0,id_aa64mmfr0_el1\n":"=r"(e));
 	return e;
 }
 
 long truly_get_sp_el0(void)
 {
 	long e = 0;
-	asm("mrs %0,sp_el0\n":"=r"(e));
+    asm("mrs %0,sp_el0\n":"=r"(e));
 	return e;
 }
 
@@ -76,6 +68,7 @@ void make_mair_el2(struct truly_vm *tvm)
 
 	mair_el2 = tp_call_hyp(read_mair_el2);
 	tvm->mair_el2 = (mair_el2 & 0x000000FF00000000L ) | 0x000000FF00000000L; //
+	//tvm->mair_el2 = 0xFFFFFFFFFFFFFFFFL;
  	tp_call_hyp(set_mair_el2, tvm->mair_el2);
 }
 
@@ -93,6 +86,10 @@ void make_mdcr_el2(struct truly_vm *tvm)
 {
 	tvm->mdcr_el2 = 0x00;
 }
+/*
+#define SCTLR_EL2_I_BIT_SHIFT		12
+#define SCTLR_EL2_C_BIT_SHIFT		2
+*/
 
 void make_sctlr_el2(struct truly_vm *tvm)
 {
@@ -289,10 +286,10 @@ unsigned long truly_get_tpidr_el0(void)
 
 unsigned long __hyp_text truly_get_ttbr0_el1(void)
 {
-	long ttbr0_el1;
+    long ttbr0_el1;
 
-	asm("mrs %0,ttbr0_el1\n":"=r" (ttbr0_el1));
-	return ttbr0_el1;
+    asm("mrs %0,ttbr0_el1\n":"=r" (ttbr0_el1));
+    return ttbr0_el1;
 }
 
 unsigned long  truly_get_exception_level(void)

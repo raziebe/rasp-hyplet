@@ -5,7 +5,7 @@ obj-$(CONFIG_TRULY_PROTECT) += \
 	hyp-init.o \
 	truly_arm.o \
 	mmu.o \
-	trulyS.o \
+	tp_hyp.o \
 	truly.o \
 	tpdriver.o \
 	ImageManager.o \

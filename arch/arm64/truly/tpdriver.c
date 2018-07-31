@@ -1,31 +1,12 @@
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
 #include <linux/init.h>      // included for __init and __exit macros
-#include <linux/slab.h>
 #include <linux/pid.h>
 #include <linux/kthread.h>
-#include <linux/sched.h>
-#include <linux/wait.h>
 #include <linux/path.h>
-#include <net/sock.h>
-#include <linux/netlink.h>
-#include <linux/kprobes.h>
+#include <linux/sched.h>
+#include <linux/uaccess.h>
 #include <linux/mm.h>
-#include <linux/notifier.h>
-#include <linux/syscalls.h>
-#include <linux/kmod.h>
-#include <linux/fdtable.h>
-#include <linux/file.h>
-#include <linux/fs.h>
-#include <linux/vmalloc.h>
-#include <linux/elf.h>
-#include <asm/uaccess.h>
-#include <asm/unistd.h>
-#include <linux/vmalloc.h>
-#include <linux/version.h>
-#include <linux/vmalloc.h>
-#include <linux/workqueue.h>
-#include <linux/kallsyms.h>
 #include <linux/truly.h>
 
 #include "tp_types.h"
@@ -243,19 +224,6 @@ clean_2:
       tp_free(path_to_free);
 }
 
-int el2_do_page_fault(unsigned long addr)
-{
-	char buf[4];
-
-	if (!copy_from_user(buf, (void *)addr, sizeof(buf))){
-		tp_err(" faulted user address %lx OK\n",addr);
-	    } else{
-		tp_err(" faulted user address %lx ERROR\n",addr);
-	}
-	el2_mmu_fault_th();
-	return 0;
-}
-
 void tp_handler_exit(struct task_struct *tsk)
 {
 	extern IMAGE_MANAGER image_manager;
@@ -266,7 +234,6 @@ void tp_handler_exit(struct task_struct *tsk)
 	im_remove_process(&image_manager,tsk->pid);
 	if (truly_is_protected(NULL)){
 		tp_unmmap_handler(tsk);
-
 		tp_reset_tvm();
 	}
 
