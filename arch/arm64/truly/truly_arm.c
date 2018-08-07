@@ -78,10 +78,9 @@ static void cpu_init_hyp_mode(void *discard)
 	boot_pgd_ptr = tp_mmu_get_boot_httbr();
 	hyp_stack_ptr = stack_page + PAGE_SIZE;
 	vector_ptr = get_hyp_vector();
-	tp_info("Assign Truly vector\n");
+	tp_info("assign truly vector %lx\n",hyp_stack_ptr);
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 	tp_run_vm(NULL);
-	return;
 }
 
 static int init_subsystems(void)

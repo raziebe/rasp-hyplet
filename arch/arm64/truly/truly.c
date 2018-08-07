@@ -86,10 +86,6 @@ void make_mdcr_el2(struct truly_vm *tvm)
 {
 	tvm->mdcr_el2 = 0x00;
 }
-/*
-#define SCTLR_EL2_I_BIT_SHIFT		12
-#define SCTLR_EL2_C_BIT_SHIFT		2
-*/
 
 void make_sctlr_el2(struct truly_vm *tvm)
 {
@@ -218,7 +214,7 @@ int truly_init(void)
 		mutex_init(&tv->sync);
 	}
 
-	tp_err("TrulyProtect Version rc-1.17\n");
+	tp_err("TrulyProtect Version rc-1.18\n");
 	init_procfs();
 	return 0;
 }
@@ -275,14 +271,13 @@ void tp_run_vm(void *x)
 
 }
 
-unsigned long truly_get_tpidr_el0(void)
+unsigned long __hyp_text truly_get_tpidr_el0(void)
 {
 	long tpidr_el0;
 
 	asm("mrs %0, tpidr_el0" : "=r"  (tpidr_el0) );
 	return tpidr_el0 ;
 }
-
 
 unsigned long __hyp_text truly_get_ttbr0_el1(void)
 {

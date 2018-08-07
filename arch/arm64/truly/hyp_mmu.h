@@ -65,6 +65,8 @@ void __hyp_text tp_clear_icache(unsigned long vaddr,int size);
 int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
 void free_boot_hyp_pgd(void);
 void free_hyp_pgds(void);
+void __hyp_text tp_flush_tlb(unsigned long vaddr);
+unsigned long __hyp_text truly_get_sp_el2(void);
 
 phys_addr_t tp_mmu_get_httbr(void);
 phys_addr_t tp_mmu_get_boot_httbr(void);

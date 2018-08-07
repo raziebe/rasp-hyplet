@@ -268,7 +268,7 @@ __truly_panic:
 	mrs	x3, esr_el2
 	mrs	x4, far_el2
 	mrs	x5, hpfar_el2
-	mrs	x7, tpidr_el2
+	mov	x7, sp
 
 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
 		      PSR_MODE_EL1h)
@@ -283,7 +283,7 @@ __truly_panic:
 ENDPROC(__truly_panic)
 __hyp_panic_str:
 	.ascii	"Truly panic:\nCode:%08x elr_el2:%016x ESR_EL2:%08x\nFAR_EL2:%016x" \
-	" HPFAR:%016x ENTRY:%p\nTrulyCxt:%p\n\0"
+	" HPFAR:%016x ENTRY:%p\nSP:%p\n\0"
 
 ENTRY(truly_get_tcr_el1)
        mrs     x0, tcr_el1
@@ -308,17 +308,23 @@ ENDPROC(read_mair_el2)
 
 ENTRY(set_mair_el2)
 	msr mair_el2,x0
-        ret
+    ret
 ENDPROC(set_mair_el2)
+
+ENTRY(truly_get_sp_el2)
+	mov x0,sp
+	ret
+ENDPROC(truly_get_sp_el2)
+
 
 ENTRY(read_ttbr0_el2)
 	mrs x0,ttbr0_el2
-        ret
+   	ret
 ENDPROC(read_ttbr0_el2)
 
 ENTRY(read_sctlr_el2)
 	mrs x0,sctlr_el2
-        ret
+    ret
 ENDPROC(read_sctlr_el2)
 
 
@@ -354,6 +360,7 @@ ENTRY(truly_run_vm)
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
+
 	ldr	x1, [x0, #TP_HCR_EL2]
   	msr     hcr_el2, x1
 
@@ -363,7 +370,7 @@ ENTRY(truly_run_vm)
    	ldr	x1, [x0, #TP_VTCR_EL2]
 	msr	vtcr_el2, x1
  
-     	ldr     x1, [x0, #TP_VTTBR_EL2]
+     ldr     x1, [x0, #TP_VTTBR_EL2]
   	msr 	vttbr_el2, x1
 
    	ldr	x1, [x0, #TP_MDCR_EL2]
@@ -374,6 +381,8 @@ ENTRY(truly_run_vm)
 
 	// Clear cntvoff for the host
 	msr	cntvoff_el2, xzr
+
+
 
 	mov	lr, x4
 	eret // must eret here. stack pointer is changed 
@@ -541,9 +550,16 @@ ENTRY(el2_mmu_fault_bh)
 ENDPROC(el2_mmu_fault_bh)
 
 ENTRY(tp_call_hyp)
-        hvc     #0
-        ret
+    hvc     #0
+    ret
 ENDPROC(tp_call_hyp)
+
+// called in EL2
+// x0 - va to flush
+ENTRY(tp_flush_tlb)
+	tlbi vae2, x0
+	ret
+ENDPROC(tp_flush_tlb)
 
 // x0 - vaddr
 // x1 - size
@@ -552,10 +568,10 @@ ENTRY(tp_clear_icache)
         push x1,x0
         push x2,x3
 
-        mrs     x3,ctr_el0
-        ubfx    x3,x3,#16,#4
-        mov     x3,#4 // x2=word size
-        lsl     x2,x2,x3 // x2 cache line size
+        mrs     x3, ctr_el0
+        ubfx    x3, x3, #16, #4
+        mov     x3, #4 // x2=word size
+        lsl     x2, x2 ,x3 // x2 cache line size
 
         add     x1, x0, x1 // end
 

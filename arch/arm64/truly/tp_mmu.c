@@ -18,9 +18,9 @@
 
 void tp_map_vmas(struct _IMAGE_FILE* image_file)
 {
-        struct vm_area_struct* vma = current->mm->mmap;
+	struct vm_area_struct* vma = current->mm->mmap;
 
-        for (;vma ; vma = vma->vm_next) {
+    for (;vma ; vma = vma->vm_next) {
 
         	if (is_addr_mapped(vma->vm_start, get_tvm())){
         		tp_info("%s: %lx already mapped\n",
@@ -41,6 +41,8 @@ void tp_map_vmas(struct _IMAGE_FILE* image_file)
         	}
 */
         }
+
+    tp_info("sp_el2 %lx\n",tp_call_hyp(truly_get_sp_el2) );
 }
 
 
@@ -69,7 +71,7 @@ void vma_map_hyp(struct vm_area_struct* vma,pgprot_t prot)
 void unmap_user_space_data(unsigned long umem,int size)
 {
 	tp_clear_icache(umem, size);
-	//tp_flush_tlb(old_pte);
+	tp_call_hyp(tp_flush_tlb,umem);
 	hyp_user_unmap(umem,  size, 1);
 	tp_debug("pid %d unmapped %lx \n", current->pid, umem);
 }
@@ -204,8 +206,9 @@ void tp_prepare_process(struct _IMAGE_FILE* image_file)
 			tv->enc->seg[0].size);
 
 	preempt_disable();
-	ttbr0_el1 = truly_get_ttbr0_el1();
-	preempt_enable();
+    ttbr0_el1 = truly_get_ttbr0_el1();
+    preempt_enable();
+
 
 	for_each_possible_cpu(cpu) {
 			struct truly_vm *tvm = get_tvm_per_cpu(cpu);
