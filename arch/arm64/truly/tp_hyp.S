@@ -558,6 +558,7 @@ ENDPROC(tp_call_hyp)
 // x0 - va to flush
 ENTRY(tp_flush_tlb)
 	tlbi vae2, x0
+	dsb sy
 	ret
 ENDPROC(tp_flush_tlb)
 
