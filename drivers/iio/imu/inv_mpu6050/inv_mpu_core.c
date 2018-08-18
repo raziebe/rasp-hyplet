@@ -880,16 +880,19 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 	struct device *dev = regmap_get_device(regmap);
 	int result;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	indio_dev = devm_iio_device_alloc(dev, sizeof(*st));
 	if (!indio_dev)
 		return -ENOMEM;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	BUILD_BUG_ON(ARRAY_SIZE(hw_info) != INV_NUM_PARTS);
 	if (chip_type < 0 || chip_type >= INV_NUM_PARTS) {
 		dev_err(dev, "Bad invensense chip_type=%d name=%s\n",
 				chip_type, name);
 		return -ENODEV;
 	}
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	st = iio_priv(indio_dev);
 	mutex_init(&st->lock);
 	st->chip_type = chip_type;
@@ -897,6 +900,7 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 	st->irq = irq;
 	st->map = regmap;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	pdata = dev_get_platdata(dev);
 	if (!pdata) {
 		result = of_iio_read_mount_matrix(dev, "mount-matrix",
@@ -910,11 +914,13 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		st->plat_data = *pdata;
 	}
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	/* power is turned on inside check chip type*/
 	result = inv_check_and_setup_chip(st);
 	if (result)
 		return result;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	if (inv_mpu_bus_setup)
 		inv_mpu_bus_setup(indio_dev);
 
@@ -924,6 +930,7 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		return result;
 	}
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	dev_set_drvdata(dev, indio_dev);
 	indio_dev->dev.parent = dev;
 	/* name will be NULL when enumerated via ACPI */
@@ -937,6 +944,7 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 	indio_dev->info = &mpu_info;
 	indio_dev->modes = INDIO_BUFFER_TRIGGERED;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	result = iio_triggered_buffer_setup(indio_dev,
 					    inv_mpu6050_irq_handler,
 					    inv_mpu6050_read_fifo,
@@ -945,6 +953,7 @@ int inv_mpu_core_probe(struct regmap *regmap, int irq, const char *name,
 		dev_err(dev, "configure buffer fail %d\n", result);
 		return result;
 	}
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	result = inv_mpu6050_probe_trigger(indio_dev);
 	if (result) {
 		dev_err(dev, "trigger probe fail %d\n", result);

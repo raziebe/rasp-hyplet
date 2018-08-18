@@ -100,26 +100,32 @@ static int inv_mpu_probe(struct i2c_client *client,
 	struct regmap *regmap;
 	const char *name;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_I2C_BLOCK))
 		return -EOPNOTSUPP;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	if (client->dev.of_node) {
+		printk("%s %d\n",__FUNCTION__,__LINE__);
 		chip_type = (enum inv_devices)
 			of_device_get_match_data(&client->dev);
 		name = client->name;
 	} else if (id) {
+		printk("%s %d\n",__FUNCTION__,__LINE__);
 		chip_type = (enum inv_devices)
 			id->driver_data;
 		name = id->name;
 	} else if (ACPI_HANDLE(&client->dev)) {
 		name = inv_mpu_match_acpi_device(&client->dev, &chip_type);
+		printk("%s %d\n",__FUNCTION__,__LINE__);
 		if (!name)
 			return -ENODEV;
 	} else {
 		return -ENOSYS;
 	}
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	regmap = devm_regmap_init_i2c(client, &inv_mpu_regmap_config);
 	if (IS_ERR(regmap)) {
 		dev_err(&client->dev, "Failed to register i2c regmap %d\n",
@@ -127,11 +133,13 @@ static int inv_mpu_probe(struct i2c_client *client,
 		return PTR_ERR(regmap);
 	}
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	result = inv_mpu_core_probe(regmap, client->irq, name,
 				    NULL, chip_type);
 	if (result < 0)
 		return result;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	st = iio_priv(dev_get_drvdata(&client->dev));
 	st->muxc = i2c_mux_alloc(client->adapter, &client->dev,
 				 1, 0, I2C_MUX_LOCKED | I2C_MUX_GATE,
@@ -141,11 +149,13 @@ static int inv_mpu_probe(struct i2c_client *client,
 		result = -ENOMEM;
 		goto out_unreg_device;
 	}
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	st->muxc->priv = dev_get_drvdata(&client->dev);
 	result = i2c_mux_add_adapter(st->muxc, 0, 0, 0);
 	if (result)
 		goto out_unreg_device;
 
+	printk("%s %d\n",__FUNCTION__,__LINE__);
 	result = inv_mpu_acpi_create_mux_client(client);
 	if (result)
 		goto out_del_mux;

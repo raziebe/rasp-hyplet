@@ -545,7 +545,13 @@
 			clocks = <&clocks BCM2835_CLOCK_VPU>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			status = "disabled";
+			status = "enabled";
+			mpu6050@68 {
+				compatible = "invensense,mpu6050";
+				reg = <0x68>;
+				interrupt-parent = <&i2c1_gpio44>; /* which interrupt is for the gpios ?*/
+				interrupts = <2 21>;	
+			};
 		};
 
 		i2c2: i2c@7e805000 {

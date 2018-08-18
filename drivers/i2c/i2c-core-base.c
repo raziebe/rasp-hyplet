@@ -1847,7 +1847,8 @@ static int i2c_check_for_quirks(struct i2c_adapter *adap, struct i2c_msg *msgs, 
 int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	unsigned long orig_jiffies;
-	int ret, try;
+	int ret,try;
+	ktime_t t1 = 0,t2 = 0;
 
 	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
 		return -EOPNOTSUPP;
@@ -1868,13 +1869,17 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	/* Retry automatically on arbitration loss */
 	orig_jiffies = jiffies;
 	for (ret = 0, try = 0; try <= adap->retries; try++) {
+		t1 =  ktime_get();
 		ret = adap->algo->master_xfer(adap, msgs, num);
+		t2 =  ktime_get();
 		if (ret != -EAGAIN)
 			break;
 		if (time_after(jiffies, orig_jiffies + adap->timeout))
 			break;
 	}
-
+	if (ret != -EAGAIN )
+		printk("%s %llu\n",__func__,ktime_to_us(t2 - t1));
+	
 	if (static_key_false(&i2c_trace_msg)) {
 		int i;
 		for (i = 0; i < ret; i++)
