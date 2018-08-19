@@ -2720,8 +2720,6 @@ int vm_munmap(unsigned long start, size_t len)
 {
 	int ret;
 	struct mm_struct *mm = current->mm;
-	void tp_unmmap_region(unsigned long start, size_t len);
-	int tp_is_active_protected(void);
 
 	LIST_HEAD(uf);
 	

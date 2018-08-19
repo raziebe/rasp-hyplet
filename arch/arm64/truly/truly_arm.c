@@ -16,16 +16,14 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include <linux/delay.h>
+//#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
+//#include <linux/of_address.h>
+//#include <linux/of_irq.h>
 #include <linux/errno.h>
-
 #include <linux/arm-cci.h>
-
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/list.h>
@@ -34,11 +32,11 @@
 #include <linux/fs.h>
 
 #include <linux/sched.h>
-#include <linux/uaccess.h>
-#include <asm/ptrace.h>
-#include <asm/mman.h>
+//#include <linux/uaccess.h>
+//#include <asm/ptrace.h>
+//#include <asm/mman.h>
 #include <asm/tlbflush.h>
-#include <asm/cacheflush.h>
+//#include <asm/cacheflush.h>
 #include <asm/virt.h>
 #include <asm/sections.h>
 
@@ -80,7 +78,7 @@ static void cpu_init_hyp_mode(void *discard)
 	vector_ptr = get_hyp_vector();
 	tp_info("assign truly vector %lx\n",hyp_stack_ptr);
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
-	tp_run_vm(NULL);
+	hyplet_run_vm(NULL);
 }
 
 static int init_subsystems(void)
@@ -126,11 +124,12 @@ static int init_hyp_mode(void)
 		goto out_err;
 	}
 
-    err = create_hyp_mappings(__hyp_idmap_text_start,  __hyp_idmap_text_end, PAGE_HYP_EXEC);
-    if (err) {
+	err = create_hyp_mappings(__hyp_idmap_text_start, 
+			 __hyp_idmap_text_end, PAGE_HYP_EXEC);
+	if (err) {
             tp_err("Cannot map world-switch code\n");
             return -1;
-    }
+	}
 
 	err = create_hyp_mappings(__bss_start, __bss_stop, PAGE_HYP);
 	if (err) {
@@ -157,6 +156,7 @@ out_err:
 	tp_err("error initializing Hyp mode: %d\n", err);
 	return err;
 }
+
 #if 0 // older kernels
 int __attribute_const__ tp_target_cpu(void)
 {
