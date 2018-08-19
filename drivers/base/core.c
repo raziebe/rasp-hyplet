@@ -1008,11 +1008,12 @@ static ssize_t online_store(struct device *dev, struct device_attribute *attr,
 	ret = strtobool(buf, &val);
 	if (ret < 0)
 		return ret;
-
+	printk("%s %d\n",__func__,__LINE__);
 	ret = lock_device_hotplug_sysfs();
 	if (ret)
 		return ret;
 
+	printk("%s %d\n",__func__,__LINE__);
 	ret = val ? device_online(dev) : device_offline(dev);
 	unlock_device_hotplug();
 	return ret < 0 ? ret : count;
@@ -2240,13 +2241,17 @@ int device_offline(struct device *dev)
 {
 	int ret;
 
+	printk("%s %d\n",__func__,__LINE__);
+
 	if (dev->offline_disabled)
 		return -EPERM;
 
+	printk("%s %d\n",__func__,__LINE__);
 	ret = device_for_each_child(dev, NULL, device_check_offline);
 	if (ret)
 		return ret;
 
+	printk("%s %d\n",__func__,__LINE__);
 	device_lock(dev);
 	if (device_supports_offline(dev)) {
 		if (dev->offline) {
@@ -2258,6 +2263,8 @@ int device_offline(struct device *dev)
 				dev->offline = true;
 			}
 		}
+	}else{
+		printk("device does not support hot unplugging\n");
 	}
 	device_unlock(dev);
 

@@ -210,11 +210,13 @@ int __cpu_disable(void)
 {
 	unsigned int cpu = smp_processor_id();
 	int ret;
-
+	
+	printk("%s %d\n",__func__,__LINE__);
 	ret = platform_cpu_disable(cpu);
 	if (ret)
 		return ret;
 
+	printk("%s %d\n",__func__,__LINE__);
 	/*
 	 * Take this CPU offline.  Once we clear this, we can't return,
 	 * and we must not schedule until we're ready to give up the cpu.
@@ -226,6 +228,7 @@ int __cpu_disable(void)
 	 */
 	migrate_irqs();
 
+	printk("%s %d\n",__func__,__LINE__);
 	/*
 	 * Flush user cache and TLB mappings, and then remove this CPU
 	 * from the vm mask set of all processes.
