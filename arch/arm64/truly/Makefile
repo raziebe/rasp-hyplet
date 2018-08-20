@@ -7,6 +7,4 @@ obj-$(CONFIG_HYPLET) += \
 	hyplet_rpc.o \
 	hyp-init.o \
 	truly_arm.o \
-	mmu.o \
-	tp_hyp.o \
-	tp_mmu.o
+	mmu.o

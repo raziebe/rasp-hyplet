@@ -60,6 +60,10 @@
 #include <linux/uidgid.h>
 #include <linux/cred.h>
 
+#ifdef __HYPLET__
+#include <linux/hyplet.h>
+#endif
+
 #include <linux/kmsg_dump.h>
 /* Move somewhere else to avoid recompiling? */
 #include <generated/utsrelease.h>
@@ -2483,6 +2487,15 @@ SYSCALL_DEFINE1(sysinfo, struct sysinfo __user *, info)
 	return 0;
 }
 
+SYSCALL_DEFINE1(hyplet, unsigned long, ctl)
+{
+#ifdef __HYPLET__
+       return hyplet_ctl (ctl);
+#else
+       return -ENOSYS;
+#endif
+}
+
 #ifdef CONFIG_COMPAT
 struct compat_sysinfo {
 	s32 uptime;
@@ -2547,4 +2560,5 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 
 	return 0;
 }
+
 #endif /* CONFIG_COMPAT */

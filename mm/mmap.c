@@ -2727,8 +2727,6 @@ int vm_munmap(unsigned long start, size_t len)
 		return -EINTR;
 
 	ret = do_munmap(mm, start, len, &uf);
-        if (tp_is_active_protected())
-                tp_unmmap_region(start, len);
 	up_write(&mm->mmap_sem);
 	userfaultfd_unmap_complete(mm, &uf);
 	return ret;

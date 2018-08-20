@@ -145,7 +145,7 @@ int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
 unsigned long   hyplet_clear_cache(pte_t* addr,long size);
-int 			create_hyp_mappings(void *, void *);
+
 unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 		hyplet_set_cxt(long addr);
@@ -157,10 +157,6 @@ int		hyplet_map_user(void);
 
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
-extern int __create_hyp_mappings(pgd_t *pgdp,
-				 unsigned long start, unsigned long end,
-				 unsigned long pfn, pgprot_t prot);
-
 
 
 #define hyplet_info(fmt, ...) \

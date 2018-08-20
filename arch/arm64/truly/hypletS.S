@@ -18,6 +18,15 @@
 ENDPROC(\label)
 .endm
 
+.macro  push, xreg1, xreg2
+        stp     \xreg1, \xreg2, [sp, #-16]!
+.endm
+
+.macro  pop, xreg1, xreg2
+        ldp     \xreg1, \xreg2, [sp], #16
+.endm
+
+
 .macro push_registers
 	push x0,x1
 	push x2,x3

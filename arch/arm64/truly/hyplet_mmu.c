@@ -10,43 +10,66 @@
 
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
+#include <linux/tp_mmu.h>
 
 extern pgd_t *hyp_pgd;
 
-
-int create_hyp_user_mappings(long _from, long _to)
+unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
 {
-        unsigned long virt_addr;
-        unsigned long from = (unsigned long)_from & PAGE_MASK;
-        unsigned long start = USER_TO_HYP((unsigned long)_from);
-        unsigned long end = USER_TO_HYP((unsigned long)_to);
-        int nr_pages = 0;
+	unsigned long pfn;
+	struct page *pages[1];
+	int nr;
 
-        start = start & PAGE_MASK;
-        end = PAGE_ALIGN(end);
-   //     hyplet_info("start %lx end %lx\n",start,end);
-
-        for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE,from += PAGE_SIZE) {
-                int err;
-                unsigned long pfn;
-
-                pfn = kvm_uaddr_to_pfn(from);
-                if (pfn <= 0)
-                        continue;
-
-                err = __create_hyp_mappings(hyp_pgd, virt_addr,
-                                            virt_addr + PAGE_SIZE,
-                                            pfn,
-                                            PAGE_HYP);
-                if (err) {
-                		hyplet_err("Failed to map %p\n",(void *)virt_addr);
-                        return err;
-                }
-                nr_pages++;
-        }
-        return nr_pages;
+	nr = get_user_pages_fast(uaddr,1, 0, (struct page **)&pages);
+	if (nr <= 0){
+	       printk("TP: INSANE: failed to get user pages %p\n",(void *)uaddr);
+	       return 0x00;
+	}
+	pfn = page_to_pfn(pages[0]);
+	put_page(pages[0]);
+	return pfn;
 }
 
+/**
+ * create_hyp_user_mappings - duplicate a user virtual address range in Hyp mode
+ * @from:	The virtual kernel start address of the range
+ * @to:		The virtual kernel end address of the range (exclusive)
+ *
+ * The same virtual address as the kernel virtual address is also used
+ * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+ * physical pages.
+ */
+int create_hyp_user_mappings(void *from, void *to,pgprot_t prot)
+{
+	unsigned long virt_addr;
+	unsigned long fr = (unsigned long)from;
+	unsigned long start = USER_TO_HYP((unsigned long)from);
+	unsigned long end = USER_TO_HYP((unsigned long)to);
+
+
+	start = start & PAGE_MASK;
+	end = PAGE_ALIGN(end);
+
+	for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE,fr += PAGE_SIZE) {
+		int err;
+		unsigned long pfn;
+
+		pfn = kvm_uaddr_to_pfn(fr);
+		if (pfn <= 0)
+			continue;
+
+		err = __create_hyp_mappings(hyp_pgd, virt_addr,
+					    virt_addr + PAGE_SIZE,
+					    pfn,
+						prot);
+		if (err) {
+			printk("TP: Failed to map %p\n",(void *)virt_addr);
+			return err;
+		}
+	}
+
+	return 0;
+}
 
 struct hyp_addr* hyplet_get_addr_segment(long addr,struct hyplet_vm *tv)
 {
@@ -76,7 +99,7 @@ int __hyplet_map_user_data(long umem,int size,int flags)
 
 	hyp = hyplet_get_vm();
 
-	pages = create_hyp_user_mappings(umem, umem + size);
+	pages = create_hyp_user_mappings((void *)umem, (void *)(umem + size), PAGE_HYP);
 	if (pages <= 0){
 			hyplet_err(" failed to map to ttbr0_el2\n");
 			return -1;
@@ -148,7 +171,7 @@ void hyplet_free_mem(struct hyplet_vm *tv)
 
         	for ( i = 0 ; i < tmp->nr_pages ; i++){
         		unsigned long addr = ( tmp->addr & PAGE_MASK )+ PAGE_SIZE * (i-1);
-        		hyplet_user_unmap( addr );
+        		hyp_user_unmap( addr , PAGE_SIZE,  1 );
         	}
 
         	hyplet_call_hyp(hyplet_invld_tlb,  tmp->addr);

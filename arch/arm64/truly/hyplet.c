@@ -13,6 +13,7 @@
 
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
+#include <linux/tp_mmu.h>
 
 DEFINE_PER_CPU(struct hyplet_vm, HYPLETS);
 
@@ -53,7 +54,7 @@ void hyplet_map_tvm(void)
 	int err;
 	struct hyplet_vm *hyp = hyplet_get_vm();
 
-	err = create_hyp_mappings(hyp,hyp + 1);
+	err = create_hyp_mappings(hyp, hyp + 1, PAGE_HYP);
 	if (err) {
 		hyplet_err("Failed to map hyplet state");
 		return;

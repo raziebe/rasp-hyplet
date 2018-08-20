@@ -16,6 +16,7 @@
 #include <asm/arch_gicv3.h>
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
+#include <linux/sched/signal.h>
 
 #include <linux/delay.h>
 #include <linux/hyplet.h>
