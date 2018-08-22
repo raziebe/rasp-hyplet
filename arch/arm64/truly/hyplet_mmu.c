@@ -8,6 +8,15 @@
 #include <linux/list.h>
 #include <linux/delay.h>
 
+#include <linux/highmem.h>
+#include <linux/compiler.h>
+#include <linux/linkage.h>
+#include <linux/init.h>
+#include <asm/sections.h>
+#include <linux/proc_fs.h>
+#include <linux/delay.h>
+
+
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 #include <linux/tp_mmu.h>
@@ -45,7 +54,7 @@ int create_hyp_user_mappings(void *from, void *to,pgprot_t prot)
 	unsigned long fr = (unsigned long)from;
 	unsigned long start = USER_TO_HYP((unsigned long)from);
 	unsigned long end = USER_TO_HYP((unsigned long)to);
-
+	int mapped = 0;
 
 	start = start & PAGE_MASK;
 	end = PAGE_ALIGN(end);
@@ -64,11 +73,12 @@ int create_hyp_user_mappings(void *from, void *to,pgprot_t prot)
 						prot);
 		if (err) {
 			printk("TP: Failed to map %p\n",(void *)virt_addr);
-			return err;
+			return mapped;
 		}
+		mapped++;
 	}
 
-	return 0;
+	return mapped;
 }
 
 struct hyp_addr* hyplet_get_addr_segment(long addr,struct hyplet_vm *tv)
@@ -99,7 +109,7 @@ int __hyplet_map_user_data(long umem,int size,int flags)
 
 	hyp = hyplet_get_vm();
 
-	pages = create_hyp_user_mappings((void *)umem, (void *)(umem + size), PAGE_HYP);
+	pages = create_hyp_user_mappings((void *)umem, (void *)(umem + size), PAGE_HYP_RW_EXEC);
 	if (pages <= 0){
 			hyplet_err(" failed to map to ttbr0_el2\n");
 			return -1;
@@ -107,13 +117,13 @@ int __hyplet_map_user_data(long umem,int size,int flags)
 
 	addr = kmalloc(sizeof(struct hyp_addr ), GFP_USER);
 	addr->addr = (unsigned long)umem;
-	addr->size = size;
+	addr->size = pages * PAGE_SIZE;
 	addr->flags = flags;
 	addr->nr_pages = pages;
 	list_add(&addr->lst, &hyp->hyp_addr_lst);
 
-//	hyplet_info("pid %d user mapped %lx size=%d pages=%d\n",
-//			current->pid,umem ,size, addr->nr_pages );
+	hyplet_info("pid %d user mapped %lx size=%d pages=%d\n",
+			current->pid,umem ,size, addr->nr_pages );
 
 
 	if (flags & VM_EXEC)
@@ -165,9 +175,9 @@ void hyplet_free_mem(struct hyplet_vm *tv)
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
-        //	hyplet_info("unmap %lx, %lx size=%d pages=%d\n",
-        //			tmp->addr, tmp->addr & PAGE_MASK,
-	//			tmp->size,  tmp->nr_pages);
+        	printk("unmap %lx, %lx size=%d pages=%d\n",
+        			tmp->addr, tmp->addr & PAGE_MASK,
+				tmp->size,  tmp->nr_pages);
 
         	for ( i = 0 ; i < tmp->nr_pages ; i++){
         		unsigned long addr = ( tmp->addr & PAGE_MASK )+ PAGE_SIZE * (i-1);

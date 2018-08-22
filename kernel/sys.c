@@ -60,13 +60,10 @@
 #include <linux/uidgid.h>
 #include <linux/cred.h>
 
-#ifdef __HYPLET__
-#include <linux/hyplet.h>
-#endif
-
 #include <linux/kmsg_dump.h>
 /* Move somewhere else to avoid recompiling? */
 #include <generated/utsrelease.h>
+#include <linux/hyplet.h>
 
 #include <linux/uaccess.h>
 #include <asm/io.h>
@@ -2489,12 +2486,9 @@ SYSCALL_DEFINE1(sysinfo, struct sysinfo __user *, info)
 
 SYSCALL_DEFINE1(hyplet, unsigned long, ctl)
 {
-#ifdef __HYPLET__
        return hyplet_ctl (ctl);
-#else
-       return -ENOSYS;
-#endif
 }
+
 
 #ifdef CONFIG_COMPAT
 struct compat_sysinfo {

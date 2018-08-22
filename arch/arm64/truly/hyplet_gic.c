@@ -42,7 +42,6 @@ int hyplet_trap_irq(int irq)
 	struct hyplet_vm *tv = hyplet_get_vm();
 
 	tv->tsk = current;
-
 	if (!(tv->state & USER_CODE_MAPPED)){
 		return -EINVAL;
 	}

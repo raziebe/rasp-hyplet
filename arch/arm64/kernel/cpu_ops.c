@@ -117,8 +117,5 @@ int __init cpu_read_ops(int cpu)
 		printk("Unsupported enable-method: %s\n", enable_method);
 		return -EOPNOTSUPP;
 	}
-	printk("%s %d %d %p\n",
-		__func__,__LINE__,cpu_ops[cpu]->cpu_die);
-
 	return 0;
 }

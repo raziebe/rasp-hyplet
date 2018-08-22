@@ -1,4 +1,4 @@
-ccflags-y +=  -Iarch/arm64/truly/ -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
+ccflags-y +=  -Iarch/arm64/truly/ -D__HYPLET__ -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
 obj-$(CONFIG_HYPLET) += \
 	hyplet_mmu.o \
 	hypletS.o \

@@ -67,10 +67,8 @@
 #include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
-
-#ifdef __HYPLET__
 #include <linux/hyplet.h>
-#endif
+
 
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
@@ -500,9 +498,7 @@ static void exit_mm(void)
 	struct mm_struct *mm = current->mm;
 	struct core_state *core_state;
 
-#ifdef __HYPLET__
-       hyplet_reset(tsk);
-#endif
+	hyplet_reset(current);
 
 	mm_release(current, mm);
 	if (!mm)

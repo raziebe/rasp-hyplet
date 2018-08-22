@@ -297,8 +297,10 @@ ENTRY(hyplet_run_user)
  *  prepare to jump to hyplet
 */
 	push_registers
-
-	mrs	x0, tpidr_el2
+/* sp_el0 is the kernel's current */
+	mrs  x0,sp_el0
+	push x0, xzr
+	mrs	 x0, tpidr_el2
 
 	mrs		x1, elr_el2
 	str		x1, [x0, HYPLET_ELR_EL2]
@@ -322,7 +324,8 @@ ENTRY(hyplet_run_user)
 	msr 	spsel,x1
 
 	msr 	cntvoff_el2,xzr
-
+	pop x0,	xzr
+	msr sp_el0,x0
 	pop_registers
 
 	ret
@@ -377,8 +380,7 @@ ENTRY(hyplet_on)
 	lsl     x0, x0, #HCR_RW_SHIFT
 	msr		hcr_el2, x0
 
-	mov		x0, #0x100
-	msr 	mdcr_el2, x0
+	msr 	mdcr_el2, xzr
 
 	pop 	x2,x3
 	pop 	x0,x1

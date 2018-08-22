@@ -258,7 +258,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
 		if (pmd_none(*pmd)) {
 			pte = pte_alloc_one_kernel(NULL, addr);
 			if (!pte) {
-				tp_err("Cannot allocate Hyp pte\n");
+				printk("Cannot allocate Hyp pte\n");
 				return -ENOMEM;
 			}
 			pmd_populate_kernel(NULL, pmd, pte);
@@ -291,7 +291,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 		if (pud_none_or_clear_bad(pud)) {
 			pmd = pmd_alloc_one(NULL, addr);
 			if (!pmd) {
-				tp_err("Cannot allocate Hyp pmd\n");
+				printk("Cannot allocate Hyp pmd\n");
 				return -ENOMEM;
 			}
 			pud_populate(NULL, pud, pmd);
@@ -337,7 +337,7 @@ int __create_hyp_mappings(pgd_t *pgdp,
 		if (pgd_none(*pgd)) {
 			pud = pud_alloc_one(NULL, addr);
 			if (!pud) {
-				tp_err("Cannot allocate Hyp pud\n");
+				printk("Cannot allocate Hyp pud\n");
 				err = -ENOMEM;
 				goto out;
 			}
@@ -435,7 +435,7 @@ int tp_mmu_init(void)
 	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, hyp_pgd_order);
 
 	if (!hyp_pgd || !boot_hyp_pgd) {
-		tp_err("Hyp mode PGD not allocated\n");
+		printk("Hyp mode PGD not allocated\n");
 		err = -ENOMEM;
 		goto out;
 	}
@@ -447,7 +447,7 @@ int tp_mmu_init(void)
 				      PAGE_HYP_EXEC);
 
 	if (err) {
-		tp_err("Failed to idmap %lx-%lx\n",
+		printk("Failed to idmap %lx-%lx\n",
 			hyp_idmap_start, hyp_idmap_end);
 		goto out;
 	}
@@ -458,7 +458,7 @@ int tp_mmu_init(void)
 				      __phys_to_pfn(hyp_idmap_start),
 				      PAGE_HYP_EXEC);
 	if (err) {
-		tp_err("Failed to map trampoline @%lx into boot HYP pgd\n",
+		printk("Failed to map trampoline @%lx into boot HYP pgd\n",
 			TRAMPOLINE_VA);
 		goto out;
 	}
@@ -469,7 +469,7 @@ int tp_mmu_init(void)
 				      __phys_to_pfn(hyp_idmap_start),
 				      PAGE_HYP_EXEC);
 	if (err) {
-		tp_err("Failed to map trampoline @%lx into runtime HYP pgd\n",
+		printk("Failed to map trampoline @%lx into runtime HYP pgd\n",
 			TRAMPOLINE_VA);
 		goto out;
 	}

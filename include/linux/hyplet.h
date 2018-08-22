@@ -1,5 +1,5 @@
-#ifndef __TRULY_H_
-#define __TRULY_H_
+#ifndef __HYPLET_H_
+#define __HYPLET_H_
 
 // page 1775
 #define DESC_TABLE_BIT 			( UL(1) << 1 )
@@ -80,10 +80,6 @@
 #define __int8  char
 typedef unsigned __int8 UCHAR;
 
-enum { ECB=0, CBC=1, CFB=2 };
-enum { DEFAULT_BLOCK_SIZE=16 };
-enum { MAX_BLOCK_SIZE=32, MAX_ROUNDS=14, MAX_KC=8, MAX_BC=8 };
-
 #define USER_CODE_MAPPED		UL(1) << 1
 #define	IRQ_TRAP_ALL			UL(0xFFFF)
 
@@ -131,12 +127,12 @@ int  		hyplet_map_user_data(int ops ,  void *action);
 int  		hyplet_trap_irq(int irq);
 int  		hyplet_untrap_irq(int irq);
 int  		hyplet_start(void);
-void 		hyplet_reset(struct task_struct *tsk);
+
 void 		hyplet_invld_tlb(unsigned long);
 void 		hyplet_free_mem(struct hyplet_vm *tv);
 void 		hyplet_reset(struct task_struct *tsk);
 void 		hyplet_user_unmap(unsigned long umem);
-int  		hyplet_ctl(unsigned long arg);
+
 int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(void);
 int  		hyplet_run_user(void);
@@ -145,7 +141,6 @@ int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
 unsigned long   hyplet_clear_cache(pte_t* addr,long size);
-
 unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 		hyplet_set_cxt(long addr);
@@ -153,7 +148,7 @@ int 		hyplet_imp_timer(void);
 void 		hyplet_trap_on(void);
 void 		hyplet_trap_off(void);
 int 		hyplet_check_mapped(void *action);
-int		hyplet_map_user(void);
+int			hyplet_map_user(void);
 
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
@@ -164,5 +159,26 @@ unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 
 #define hyplet_err(fmt, ...) \
 		pr_err("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
+
+#ifdef __HYPLET__
+
+static inline void	__hyplet_run(int irq){
+	if (irq)
+		hyplet_run(irq);
+}
+
+void 	hyplet_reset(struct task_struct *tsk);
+int  	hyplet_ctl(unsigned long arg);
+
+#else
+
+#define	__hyplet_run(a)
+#define hyplet_reset(a)
+
+static inline int  	hyplet_ctl(unsigned long arg){
+	return -ENOSYS;
+}
+
+#endif
 
 #endif
