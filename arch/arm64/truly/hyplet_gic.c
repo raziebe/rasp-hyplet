@@ -22,10 +22,8 @@
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
 
-int hyplet_imp_timer(void)
+int hyplet_imp_timer(struct hyplet_vm *hyp)
 {
-	struct hyplet_vm *hyp = hyplet_get_vm();
-
 	hyp->irq_to_trap = IRQ_TRAP_ALL;
 
 	if (!(hyp->state & USER_CODE_MAPPED)){
@@ -37,10 +35,8 @@ int hyplet_imp_timer(void)
 	return 0;
 }
 
-int hyplet_trap_irq(int irq)
+int hyplet_trap_irq(struct hyplet_vm *tv,int irq)
 {
-	struct hyplet_vm *tv = hyplet_get_vm();
-
 	tv->tsk = current;
 	if (!(tv->state & USER_CODE_MAPPED)){
 		return -EINVAL;
@@ -51,7 +47,7 @@ int hyplet_trap_irq(int irq)
 	return 0;
 }
 
-int hyplet_untrap_irq(int irq)
+int hyplet_untrap_irq(struct hyplet_vm *hyp, int irq)
 {
 	hyplet_reset(current);
 	return 0;
@@ -68,7 +64,7 @@ int hyplet_run(int irq)
 {
 	struct hyplet_vm *hyp;
 	
-	hyp = hyplet_get_vm();
+	hyp = hyplet_get(raw_smp_processor_id());
 	if (hyp->tsk == NULL)
 		return 0; 
 

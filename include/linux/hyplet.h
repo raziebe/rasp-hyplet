@@ -80,8 +80,9 @@
 #define __int8  char
 typedef unsigned __int8 UCHAR;
 
-#define USER_CODE_MAPPED		UL(1) << 1
+#define USER_CODE_MAPPED		(UL(1) << 1)
 #define	IRQ_TRAP_ALL			UL(0xFFFF)
+#define HYPLET_OFFLINE_ON		(UL(2) << 1)
 
 struct hyp_addr {
 	struct list_head lst;
@@ -115,7 +116,6 @@ struct hyplet_vm {
 
 extern char __hyplet_vectors[];
 
-struct 		hyplet_vm *hyplet_get_vm(void);
 int  		hyplet_init(void);
 void 		hyplet_smp_run_hyp(void);
 void 		hyplet_on(void *);
@@ -124,8 +124,8 @@ long 		hyplet_call_hyp(void *hyper_func, ...);
 void 		hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long 	hyplet_get_vectors(void);
 int  		hyplet_map_user_data(int ops ,  void *action);
-int  		hyplet_trap_irq(int irq);
-int  		hyplet_untrap_irq(int irq);
+int  		hyplet_trap_irq(struct hyplet_vm *, int irq);
+int  		hyplet_untrap_irq(struct hyplet_vm *,int irq);
 int  		hyplet_start(void);
 
 void 		hyplet_invld_tlb(unsigned long);
@@ -134,7 +134,7 @@ void 		hyplet_reset(struct task_struct *tsk);
 void 		hyplet_user_unmap(unsigned long umem);
 
 int  		hyplet_run(int irq);
-int  		hyplet_trapped_irq(void);
+int  		hyplet_trapped_irq(struct hyplet_vm *);
 int  		hyplet_run_user(void);
 int			hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
@@ -144,12 +144,12 @@ unsigned long   hyplet_clear_cache(pte_t* addr,long size);
 unsigned long   hyplet_smp_rpc(long val);
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 		hyplet_set_cxt(long addr);
-int 		hyplet_imp_timer(void);
+int 		hyplet_imp_timer(struct hyplet_vm *);
 void 		hyplet_trap_on(void);
 void 		hyplet_trap_off(void);
-int 		hyplet_check_mapped(void *action);
-int			hyplet_map_user(void);
-
+int 		hyplet_check_mapped(struct hyplet_vm *,void *action);
+int			hyplet_map_user(struct hyplet_vm *);
+void 		hyplet_offlet(unsigned int cpu);
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 

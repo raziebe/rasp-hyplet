@@ -10,6 +10,7 @@ typedef enum {
 	   HYPLET_REGISTER_BH = 6, // register the task to wake up
 	   HYPLET_SET_RPC  = 7,
 	   HYPLET_IMP_TIMER = 8,
+	   OFFLET_SET_CALLBACK = 9,
 }hyplet_ops;
 
 
@@ -30,11 +31,16 @@ struct hyplet_rpc_set {
 
 struct hyplet_ctrl {
 	int cmd  __attribute__ ((packed));
+
 	union  {
 		struct hyplet_map_addr 	addr ;
 		struct hyplet_rpc_set 	rpc_set_func;
+	} __action  __attribute__ ((packed));
+
+	union {
 		int irq;
-	}__action  __attribute__ ((packed));
+		int cpu;
+	}__resource  __attribute__ ((packed));
 };
 
 #endif
