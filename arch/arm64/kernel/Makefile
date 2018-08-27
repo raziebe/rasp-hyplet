@@ -12,6 +12,7 @@ CFLAGS_REMOVE_return_address.o = -pg
 
 CFLAGS_setup.o = -DUTS_MACHINE='"$(UTS_MACHINE)"'
 
+
 # Object file lists.
 arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
@@ -61,6 +62,10 @@ extra-y					+= $(head-y) vmlinux.lds
 
 ifeq ($(CONFIG_DEBUG_EFI),y)
 AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
+endif
+
+ifeq ($(CONFIG_HYPELET), y)
+CFLAGS_smp += -D__HYPLET__
 endif
 
 # will be included by each individual module but not by the core kernel itself

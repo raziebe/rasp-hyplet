@@ -58,6 +58,10 @@
 #include <asm/ptrace.h>
 #include <asm/virt.h>
 
+#include <linux/smp.h>
+#include <linux/hyplet.h>
+
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
 
@@ -384,7 +388,6 @@ void __cpu_die(unsigned int cpu)
  */
 void cpu_die(void)
 {
-	unsigned long i = 0;
 	unsigned int cpu = smp_processor_id();
 
 	idle_task_exit();
@@ -399,13 +402,7 @@ void cpu_die(void)
 	 * mechanism must perform all required cache maintenance to ensure that
 	 * no dirty lines are lost in the process of shutting down the CPU.
 	 */
-	while(1) {
-		cpu_relax();
-		if (i++ == 10000000000LL) {
-			printk("cpu die\n");
-			i = 0;
-		}
-	}
+	hyplet_offlet(cpu);
 	cpu_ops[cpu]->cpu_die(cpu);
 
 	BUG();
