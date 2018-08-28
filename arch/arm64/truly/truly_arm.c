@@ -17,15 +17,26 @@
  */
 
 #include <linux/init.h>
+#include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/arm-cci.h>
+#include <linux/errno.h>
+#include <linux/err.h>
+#include <linux/list.h>
 #include <linux/module.h>
+#include <linux/vmalloc.h>
+#include <linux/fs.h>
+
+#include <linux/sched.h>
+#include <asm/tlbflush.h>
+
+#include <asm/virt.h>
 #include <asm/sections.h>
 
 #include <linux/hyplet.h>
 #include <linux/truly.h>
-
 #include "hyp_mmu.h"
-
-#define __HYPLET_VERSION__	"Version rc19"
 
 
 static DEFINE_PER_CPU(unsigned long, tp_arm_hyp_stack_page);
@@ -132,8 +143,7 @@ static int init_hyp_mode(void)
 		}
 	}
 
-	printk("Hyp mode initialized successfully %s\n",
-			__HYPLET_VERSION__);
+	printk("Hyp mode initialized successfully\n");
 	return 0;
 
 out_err:

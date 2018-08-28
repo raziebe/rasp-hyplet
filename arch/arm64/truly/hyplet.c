@@ -84,26 +84,34 @@ void hyplet_setup(void)
 
 int is_hyplet_on(void)
 {
-	struct hyplet_vm *tv = hyplet_get_vm();
-	return (tv->irq_to_trap != 0);
+	struct hyplet_vm *hyp = hyplet_get_vm();
+	return (hyp->irq_to_trap != 0);
 }
 
 void __close_hyplet(void *task, struct hyplet_vm *hyp)
 {
+	int offlet_mode = 0;
 	struct task_struct *tsk;
 	tsk =  (struct task_struct *)task;
 
 	if (hyp->tsk->mm != tsk->mm)
 		return;
 
-	hyplet_call_hyp(hyplet_trap_off);
+	if (!(hyp->state & HYPLET_OFFLINE_ON))
+		hyplet_call_hyp(hyplet_trap_off);
+
 	hyp->tsk = NULL;
+	smp_mb();
+	while (hyp->state & HYPLET_OFFLINE_RUN) {
+		offlet_mode = 1;
+		msleep(1);
+		hyplet_debug("Waiting for offlet to exit..\n");
+	}
+
 	hyp->irq_to_trap = 0;
 	hyp->hyplet_id = 0;
 	hyp->user_hyplet_code = 0;
-
-	if (hyplet_get_vm() == hyp)
-		/* Not an offline mode  */
+	if (!offlet_mode)
 		hyplet_free_mem(hyp);
 	hyp->state  = HYPLET_OFFLINE_ON;
 	smp_mb();
@@ -111,7 +119,7 @@ void __close_hyplet(void *task, struct hyplet_vm *hyp)
 	hyp->hyplet_stack = 0;
 	hyp->user_hyplet_code = 0;
 	smp_mb();
-	hyp->hyplet_id  =0 ;
+	hyp->hyplet_id  = 0;
 	hyplet_info("Close hyplet\n");
 }
 
@@ -127,27 +135,54 @@ void close_hyplet(void *task)
 
 /*
  * call on each process shutdown
- */
+*/
 void hyplet_reset(struct task_struct *tsk)
 {
 	int i;
+	struct hyplet_vm *hyp;
 
 	on_each_cpu(close_hyplet, tsk, 1);
-	//
-	// We're left with the offline processors,
-	//
-	for (i = 0 ; i < num_possible_cpus(); i++){
-		struct hyplet_vm *hyp = hyplet_get(i);
 
-		if ((hyp->state  & HYPLET_OFFLINE_ON) &&
-			hyp->state  != HYPLET_OFFLINE_ON){
-			printk("hyplet offlet: %d %p\n",i, hyp->tsk);
+	for (i = 0 ; i < num_possible_cpus(); i++){
+		hyp = hyplet_get(i);
+
+		if (hyp->state  & HYPLET_OFFLINE_RUN) {
+				printk("hyplet offlet discoverred on cpu %d %p\n",
+					i, hyp->tsk);
+			__close_hyplet(tsk, hyp);
 		}
-		if (!hyp->tsk) {
-			continue;
-		}
-		__close_hyplet(tsk, hyp);
 	}
+}
+
+void hyplet_offlet(unsigned int cpu)
+{
+	struct hyplet_vm *hyp;
+
+	hyp = hyplet_get_vm();
+	printk("offlet : Enter %d\n",cpu);
+
+	while (hyp->state & HYPLET_OFFLINE_ON) {
+		/*
+		 * Wait for an assignment.
+		 */
+		while (hyp->tsk == NULL
+				|| hyp->user_hyplet_code == 0x00){
+			cpu_relax();
+		}
+
+		hyp->state |= HYPLET_OFFLINE_RUN;
+
+		printk("hyplet offlet: Start run\n");
+		while (hyp->tsk != NULL) {
+			hyplet_call_hyp(hyplet_run_user);
+			cpu_relax();
+		}
+		hyplet_free_mem(hyp);
+		hyp->state &= ~(HYPLET_OFFLINE_RUN);
+		smp_mb();
+		printk("hyplet offlet : Ended\n");
+	}
+	printk("offlet : Exit %d\n",cpu);
 }
 
 int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
@@ -167,41 +202,15 @@ int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
 	return 0;
 }
 
-void hyplet_offlet(unsigned int cpu)
-{
-	struct hyplet_vm *hyp;
-
-	hyp = hyplet_get_vm();
-	printk("offlet : Enter %d\n",cpu);
-
-	while (hyp->state & HYPLET_OFFLINE_ON) {
-		/*
-		 * Wait for an assignment.
-		 */
-		while (hyp->tsk == NULL
-				|| hyp->user_hyplet_code == 0x00){
-			cpu_relax();
-		}
-
-		printk("hyplet offlet: Start");
-		while (hyp->tsk != NULL) {
-			hyplet_call_hyp(hyplet_run_user);
-			cpu_relax();
-		}
-		hyplet_free_mem(hyp);
-		printk("hyplet offlet : Ended\n");
-	}
-	printk("offlet : Exit %d\n",cpu);
-}
-
 int offlet_assign(int cpu,struct hyplet_ctrl* target_hplt,struct hyplet_vm *src_hyp)
 {
 	struct hyplet_vm *hyp = hyplet_get(cpu);
 
 	if (hyp == NULL){
-		printk("offlet: Failed to assign hyplet\n");
+		hyplet_err("Failed to assign hyplet in %d\n",cpu);
 		return -1;
 	}
+
 	printk("offlet %p %p\n",target_hplt, src_hyp);
 	hyp->state  = src_hyp->state;
 	smp_mb();

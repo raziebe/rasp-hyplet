@@ -3,18 +3,11 @@
 #include <linux/init.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
-#include <asm/page.h>
 #include <asm/cacheflush.h>
 #include <linux/list.h>
-#include <linux/delay.h>
 
 #include <linux/highmem.h>
 #include <linux/compiler.h>
-#include <linux/linkage.h>
-#include <linux/init.h>
-#include <asm/sections.h>
-#include <linux/proc_fs.h>
-#include <linux/delay.h>
 
 
 #include <linux/hyplet.h>
@@ -119,8 +112,7 @@ int __hyplet_map_user_data(long umem,int size,int flags,struct hyplet_vm *hyp)
 	list_add(&addr->lst, &hyp->hyp_addr_lst);
 
 //	hyplet_info("pid %d user mapped %lx size=%d pages=%d\n",
-//			current->pid,umem ,size, addr->nr_pages );
-
+	//		current->pid,umem ,size, addr->nr_pages );
 
 	if (flags & VM_EXEC) {
 		hyp->state  |= USER_CODE_MAPPED;
@@ -160,33 +152,28 @@ int hyplet_check_mapped(struct hyplet_vm *hyp,void *action)
 void hyplet_free_mem(struct hyplet_vm *tv)
 {
         struct hyp_addr* tmp,*tmp2;
-        int i;
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
-        	//printk("unmap %lx, %lx size=%d pages=%d\n",
-        	//		tmp->addr, tmp->addr & PAGE_MASK,
-			//	tmp->size,  tmp->nr_pages);
+/*
+        	hyplet_info("unmap %lx/%lx size=%d "
+        			"pages=%d flags=%x\n",
+        		tmp->addr,
+				tmp->addr & PAGE_MASK,
+				tmp->size,
+				tmp->nr_pages, tmp->flags);
+*/
 
-        	for ( i = 0 ; i < tmp->nr_pages ; i++){
-        		unsigned long addr = ( tmp->addr & PAGE_MASK )+ PAGE_SIZE * (i-1);
-        		hyp_user_unmap( addr , PAGE_SIZE,  1 );
-        	}
-
+        	hyp_user_unmap( tmp->addr , PAGE_SIZE,  1 );
         	hyplet_call_hyp(hyplet_invld_tlb,  tmp->addr);
 
-        	if (tmp->flags &  VM_ACCOUNT) {
+         	if (tmp->flags & VM_EXEC)
+        			flush_icache_range(tmp->addr, tmp->addr + tmp->size);
 
-        		if (tmp->flags & VM_EXEC) {
-        			flush_icache_range(tmp->addr,
-    						tmp->addr + tmp->size);
-        			continue;
-        		}
-    //			if (tmp->flags & VM_READ)
-    	//			__flush_dcache_area((void *)tmp->addr, tmp->size);
-    		}
+         	if (tmp->flags & (VM_READ | VM_WRITE))
+    			__flush_cache_user_range(tmp->addr, tmp->addr + tmp->size);
 
-        	list_del(&tmp->lst);
+         	list_del(&tmp->lst);
         	kfree(tmp);
         }
 }

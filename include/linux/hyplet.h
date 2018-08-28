@@ -80,9 +80,11 @@
 #define __int8  char
 typedef unsigned __int8 UCHAR;
 
-#define USER_CODE_MAPPED		(UL(1) << 1)
-#define	IRQ_TRAP_ALL			UL(0xFFFF)
-#define HYPLET_OFFLINE_ON		(UL(2) << 1)
+
+#define	IRQ_TRAP_ALL			(UL(0xFFFF) )
+#define USER_CODE_MAPPED		(UL(1) << 0)
+#define HYPLET_OFFLINE_ON		(UL(1) << 1)
+#define HYPLET_OFFLINE_RUN		(UL(1) << 2)
 
 struct hyp_addr {
 	struct list_head lst;
@@ -159,6 +161,9 @@ unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 
 #define hyplet_err(fmt, ...) \
 		pr_err("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
+
+#define hyplet_debug(fmt, ...) \
+		pr_debug("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
 
 #ifdef __HYPLET__
 

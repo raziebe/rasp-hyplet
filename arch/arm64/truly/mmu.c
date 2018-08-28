@@ -135,6 +135,7 @@ static void unmap_pmds(pud_t *pud,
 		clear_pud_entry( pud, start_addr);
 }
 
+
 static void unmap_puds( pgd_t *pgd,
 		       phys_addr_t addr, phys_addr_t end)
 {
