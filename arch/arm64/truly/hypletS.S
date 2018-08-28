@@ -155,6 +155,12 @@ ENTRY(hyplet_invld_tlb)
 	ret
 ENDPROC(hyplet_invld_tlb)
 
+ENTRY(hyplet_invld_all_tlb)
+	tlbi alle2
+	dsb sy
+	ret
+ENDPROC(hyplet_invld_all_tlb)
+
 /* 
   x0 address
   x1 size

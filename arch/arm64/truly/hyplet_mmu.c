@@ -176,4 +176,5 @@ void hyplet_free_mem(struct hyplet_vm *tv)
          	list_del(&tmp->lst);
         	kfree(tmp);
         }
+	hyplet_call_hyp(hyplet_invld_all_tlb);
 }
