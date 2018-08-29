@@ -100,8 +100,8 @@ int __hyplet_map_user_data(long umem,int size,int flags,struct hyplet_vm *hyp)
 
 	pages = create_hyp_user_mappings((void *)umem, (void *)(umem + size), PAGE_HYP_RW_EXEC);
 	if (pages <= 0){
-			hyplet_err(" failed to map to ttbr0_el2\n");
-			return -1;
+		hyplet_debug(" failed to map to ttbr0_el2\n");
+		return -1;
 	}
 
 	addr = kmalloc(sizeof(struct hyp_addr ), GFP_USER);
@@ -143,7 +143,7 @@ int hyplet_check_mapped(struct hyplet_vm *hyp,void *action)
 	struct hyplet_map_addr *uaddr = (struct hyplet_map_addr *)action;
 
 	if (hyplet_get_addr_segment(uaddr->addr ,hyp)) {
-		hyplet_err(" address %lx already mapped\n",uaddr->addr);
+		hyplet_debug(" address %lx already mapped\n",uaddr->addr);
 		return 1;
 	}
 	return 0;

@@ -147,19 +147,27 @@ void hyplet_reset(struct task_struct *tsk)
 		hyp = hyplet_get(i);
 
 		if (hyp->state  & HYPLET_OFFLINE_RUN) {
-				printk("hyplet offlet discoverred on cpu %d %p\n",
+			hyplet_debug("hyplet offlet discoverred on cpu %d %p\n",
 					i, hyp->tsk);
 			__close_hyplet(tsk, hyp);
 		}
 	}
 }
 
+#define __GPIO__
+
+#ifdef __GPIO__
+#include <linux/gpio.h>
+int gpio = 475; // the gpio we toggle
+static int toggle = 0;
+#endif
+
 void hyplet_offlet(unsigned int cpu)
 {
 	struct hyplet_vm *hyp;
 
 	hyp = hyplet_get_vm();
-	printk("offlet : Enter %d\n",cpu);
+	hyplet_debug("offlet : Enter %d\n",cpu);
 
 	while (hyp->state & HYPLET_OFFLINE_ON) {
 		/*
@@ -172,17 +180,20 @@ void hyplet_offlet(unsigned int cpu)
 
 		hyp->state |= HYPLET_OFFLINE_RUN;
 
-		printk("hyplet offlet: Start run\n");
+		hyplet_debug("hyplet offlet: Start run\n");
 		while (hyp->tsk != NULL) {
 			hyplet_call_hyp(hyplet_run_user);
-			cpu_relax();
+#ifdef __GPIO__
+			gpio_set_value(gpio, toggle);
+			toggle = !toggle;
+#endif
 		}
 		hyplet_free_mem(hyp);
 		hyp->state &= ~(HYPLET_OFFLINE_RUN);
 		smp_mb();
-		printk("hyplet offlet : Ended\n");
+		hyplet_debug("hyplet offlet : Ended\n");
 	}
-	printk("offlet : Exit %d\n",cpu);
+	hyplet_debug("offlet : Exit %d\n",cpu);
 }
 
 int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
@@ -211,14 +222,13 @@ int offlet_assign(int cpu,struct hyplet_ctrl* target_hplt,struct hyplet_vm *src_
 		return -1;
 	}
 
-	printk("offlet %p %p\n",target_hplt, src_hyp);
 	hyp->state  = src_hyp->state;
 	smp_mb();
 	hyp->tsk = current;
 	hyp->user_hyplet_code = target_hplt->__action.addr.addr;
 	hyp->hyplet_stack = src_hyp->hyplet_stack;
 	smp_mb();
-	printk("offlet: hyplet assigned to cpu %d\n",cpu);
+	hyplet_debug("offlet: hyplet assigned to cpu %d\n",cpu);
 	return 0;
 }
 
@@ -242,7 +252,7 @@ int hyplet_ctl(unsigned long arg)
 	if (hplt.__resource.cpu >= 0)
 			hyp = hyplet_get(hplt.__resource.cpu);
 
-	printk("offlet: assigning to cpu  %d \n",hplt.__resource.cpu);
+	hyplet_debug("assigning to cpu  %d \n",hplt.__resource.cpu);
 
 	switch (hplt.cmd)
 	{
