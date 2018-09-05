@@ -16,26 +16,13 @@ int iters  = 0;
 unsigned long next = 0;
 
 /*
- * This code is executed in an hyplet context
- */
-long user_timer(void *opaque)
-{
-	if (next==0)
-		next = hyp_gettime();
-
-	while (hyp_gettime()  < next);
-
-	next +=  interval_ns;
-	return 0;
-}
-
-/*
 	Put whatever you want here
 */
 long user_print(void *opaque)
 {
-	if ((iters % 10) == 0)
-		hyp_print("iters %d\n",iters);
+	hyp_print("iters %d %f %s\n",
+		iters,  0.3,
+		 __FUNCTION__);
 	iters++;
 	return 0;
 }
@@ -55,7 +42,6 @@ static int hyplet_start(void)
 		fprintf(stderr, "hyplet: Failed to allocate a stack\n");
 		return -1;
 	}
-
 // must fault it
 	memset(stack_addr, 0x00, stack_size);
 	if (hyplet_map_all(cpu)) {
@@ -82,20 +68,24 @@ static int hyplet_start(void)
 */
 int main(int argc, char *argv[])
 {
+    int i;
     int rc;
 
-    if (argc <= 2){
-        printf("%s <cpu> <interval ns> ",argv[0]);
+    if (argc <= 1){
+        printf("%s <cpu>\n",argv[0]);
         return -1;
     }
    
     cpu = atoi(argv[1]);
-    interval_ns = atoi(argv[2]);
+    printf("Set the offlet to cpu %d "
+		"interval %d Version rc-1.5\n", cpu, interval_ns);
 
-    printf("Setting offlet to cpu %d "
-		"interval %d Version rc-1.2\n", cpu, interval_ns);
+    hyplet_drop_cpu(cpu);
+
     hyplet_start();
     printf("Waiting for offlet %d for 5 seconds\n",cpu);
-    sleep(5);
-    printf("cycles %d\n", iters);
+    for (i = 0 ; i < 10 ; i++){
+    	usleep(100);
+    	print_hyp(i);
+    }
 }
