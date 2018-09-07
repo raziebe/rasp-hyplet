@@ -14,10 +14,4 @@ OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
 #$CC   -I ../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
 #$CC   -I ../../../../include offlet_hyplet.c hyplet_utils.c -o offlet1
 #$CC   -I ../../../../include offlet_timer.c hyplet_utils.c -o timer
-$CC   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utils.S  -o offprint
-
-
-sudo mount /dev/mapper/loop0p2 /media/fvp
-#sudo cp uprint /media/fvp//home/root/
-sudo cp offprint /media/fvp//home/root/offprint
-sudo umount /media/fvp
+$CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utils.S  -o offprint
