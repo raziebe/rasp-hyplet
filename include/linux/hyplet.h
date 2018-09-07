@@ -95,6 +95,7 @@ struct hyp_addr {
 
 };
 
+
 struct hyplet_vm {
 	unsigned int irq_to_trap __attribute__ ((packed));
 	int	hyplet_id __attribute__ ((packed));//  the hyplet of this core
@@ -109,12 +110,20 @@ struct hyplet_vm {
 	unsigned long user_hyplet_code;	// this core hyplet codes
 
 	struct task_struct *tsk;
+ 	struct list_head callbacks_lst;
+ 	spinlock_t lst_lock;
 
  	struct list_head hyp_addr_lst;
  	unsigned long state __attribute__ ((packed));
 	unsigned long faulty_elr_el2 __attribute__ ((packed));
 	unsigned long faulty_esr_el2 __attribute__ ((packed));
 } __attribute__ ((aligned (8)));
+
+struct hyp_wait{
+	wait_queue_head_t wait_queue;
+	void (*offlet_action)(struct hyplet_vm *,struct hyp_wait *);
+	struct list_head next;
+};
 
 extern char __hyplet_vectors[];
 
@@ -138,7 +147,7 @@ void 		hyplet_user_unmap(unsigned long umem);
 int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(struct hyplet_vm *);
 int  		hyplet_run_user(void);
-int			hyplet_dump_irqs(void);
+int		hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
@@ -150,9 +159,9 @@ int 		hyplet_imp_timer(struct hyplet_vm *);
 void 		hyplet_trap_on(void);
 void 		hyplet_trap_off(void);
 int 		hyplet_check_mapped(struct hyplet_vm *,void *action);
-int			hyplet_map_user(struct hyplet_vm *);
+int		hyplet_map_user(struct hyplet_vm *);
 void 		hyplet_offlet(unsigned int cpu);
-void            hyplet_invld_all_tlb(void);
+void		hyplet_invld_all_tlb(void);
 
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 

@@ -78,14 +78,15 @@ int main(int argc, char *argv[])
    
     cpu = atoi(argv[1]);
     printf("Set the offlet to cpu %d "
-		"interval %d Version rc-1.5\n", cpu, interval_ns);
+		"interval %d Version rc-1.6\n", cpu, interval_ns);
 
     hyplet_drop_cpu(cpu);
 
     hyplet_start();
     printf("Waiting for offlet %d for 5 seconds\n",cpu);
-    for (i = 0 ; i < 10 ; i++){
-    	usleep(100);
-    	print_hyp(i);
-    }
+    usleep(100);
+    hyp_wait(cpu, 10);
+    print_hyp(i);
 }
+
+

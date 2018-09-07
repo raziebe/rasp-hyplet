@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include "hyp_spinlock.h"
 
 #include <linux/hyplet_user.h>
 #include "hyplet_utils.h"
@@ -165,13 +165,17 @@ int hyplet_set_stack(void* addr,int size,int cpu)
 	return __hyplet_map(HYPLET_MAP_STACK, addr, size, cpu);
 }
 
+static void hyplet_init_print(void)
+{
+	memset(&hypstate, 0x00, sizeof(hypstate));
+	hyp_print("fault me\n");
+    hypstate.fmt_idx = 0;
+}
+
 int hyplet_map_all(int cpu)
 {
 	struct hyplet_ctrl hplt;
-
-	memset(&hypstate, 0x00, sizeof(hypstate));
-	hyp_print("fault me\n");
-     	hypstate.fmt_idx = 0;
+	hyplet_init_print();
 	hplt.__resource.cpu = cpu;
 	return hyplet_ctl(HYPLET_MAP_ALL, &hplt);
 }
@@ -195,6 +199,14 @@ int hyplet_rpc_set(void *user_hyplet,int func_id,int cpu)
 	return 0;
 }
 
+int hyp_wait(int cpu,int ms)
+{
+	struct hyplet_ctrl hplt;
+
+     	hplt.__resource.timeout_ms = ms;
+	hplt.__resource.cpu = cpu;
+	return hyplet_ctl(HYPLET_WAIT, &hplt);
+}
 
 /*
  * Collect & Cache the arguments 
@@ -239,11 +251,21 @@ int hyp_print(const char *fmt, ...)
                }
            va_end(ap);
      }
+
+     spin_lock(&hypstate.sync);
      hypstate.fmt_idx =  (hypstate.fmt_idx + 1) % PRINT_LINES;
+     spin_unlock(&hypstate.sync);
 }
 
 
 void print_hyp(int idx) {
+
+	struct hyp_fmt fmt;
+
+	spin_lock(&hypstate.sync);
+	memcpy(&fmt,&hypstate.fmt[idx],sizeof(fmt));
+	spin_unlock(&hypstate.sync);
+
 	hyp_print2(&hypstate.fmt[idx]);
 }
 

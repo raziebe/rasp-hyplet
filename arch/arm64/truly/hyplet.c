@@ -8,6 +8,7 @@
 #include <asm/sections.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
+#include<linux/workqueue.h>
 
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
@@ -39,10 +40,14 @@ int hyplet_init(void)
 			memcpy(hyp, tv, sizeof(*tv));
 		}
 		INIT_LIST_HEAD(&hyp->hyp_addr_lst);
+		INIT_LIST_HEAD(&hyp->callbacks_lst);
+		spin_lock_init(&hyp->lst_lock);
+
 		hyp->state = HYPLET_OFFLINE_ON;
 	}
 	return 0;
 }
+
 
 void hyplet_map(void)
 {
@@ -147,27 +152,57 @@ void hyplet_reset(struct task_struct *tsk)
 		hyp = hyplet_get(i);
 
 		if (hyp->state  & HYPLET_OFFLINE_RUN) {
-			hyplet_debug("hyplet offlet discoverred on cpu %d %p\n",
+				printk("hyplet offlet discoverred on cpu %d %p\n",
 					i, hyp->tsk);
 			__close_hyplet(tsk, hyp);
 		}
 	}
 }
 
-#define __GPIO__
+static void signal_any(struct hyplet_vm *hyp)
+{
+	unsigned long flags;
+    struct hyp_wait *tmp;
 
-#ifdef __GPIO__
-#include <linux/gpio.h>
-int gpio = 475; // the gpio we toggle
-static int toggle = 0;
-#endif
+    spin_lock_irqsave(&hyp->lst_lock, flags);
+
+    list_for_each_entry(tmp, &hyp->callbacks_lst, next) {
+		tmp->offlet_action(hyp, tmp);
+	}
+    spin_unlock_irqrestore(&hyp->lst_lock, flags);
+}
+
+static void offlet_wake(struct hyplet_vm *hyp,struct hyp_wait* hypevent)
+{
+	wake_up_interruptible(&hypevent->wait_queue);
+}
+
+static void wait_for_hyplet(struct hyplet_vm *hyp,int ms)
+{
+	unsigned long flags;
+	struct hyp_wait hypevent;
+
+	hypevent.offlet_action = offlet_wake;
+
+	init_waitqueue_head(&hypevent.wait_queue);
+
+	spin_lock_irqsave(&hyp->lst_lock, flags);
+	list_add(&hypevent.next ,&hyp->callbacks_lst);
+	spin_unlock_irqrestore(&hyp->lst_lock, flags);
+
+	wait_event_timeout(hypevent.wait_queue, 1, ms);
+
+	spin_lock_irqsave(&hyp->lst_lock, flags);
+	list_del(&hypevent.next);
+	spin_unlock_irqrestore(&hyp->lst_lock, flags);
+}
 
 void hyplet_offlet(unsigned int cpu)
 {
 	struct hyplet_vm *hyp;
 
 	hyp = hyplet_get_vm();
-	hyplet_debug("offlet : Enter %d\n",cpu);
+	printk("offlet : Enter %d\n",cpu);
 
 	while (hyp->state & HYPLET_OFFLINE_ON) {
 		/*
@@ -180,20 +215,18 @@ void hyplet_offlet(unsigned int cpu)
 
 		hyp->state |= HYPLET_OFFLINE_RUN;
 
-		hyplet_debug("hyplet offlet: Start run\n");
+		printk("hyplet offlet: Start run\n");
 		while (hyp->tsk != NULL) {
 			hyplet_call_hyp(hyplet_run_user);
-#ifdef __GPIO__
-			gpio_set_value(gpio, toggle);
-			toggle = !toggle;
-#endif
+			signal_any(hyp);
+			cpu_relax();
 		}
 		hyplet_free_mem(hyp);
 		hyp->state &= ~(HYPLET_OFFLINE_RUN);
 		smp_mb();
-		hyplet_debug("hyplet offlet : Ended\n");
+		printk("hyplet offlet : Ended\n");
 	}
-	hyplet_debug("offlet : Exit %d\n",cpu);
+	printk("offlet : Exit %d\n",cpu);
 }
 
 int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
@@ -221,14 +254,14 @@ int offlet_assign(int cpu,struct hyplet_ctrl* target_hplt,struct hyplet_vm *src_
 		hyplet_err("Failed to assign hyplet in %d\n",cpu);
 		return -1;
 	}
-
 	hyp->state  = src_hyp->state;
 	smp_mb();
 	hyp->tsk = current;
 	hyp->user_hyplet_code = target_hplt->__action.addr.addr;
 	hyp->hyplet_stack = src_hyp->hyplet_stack;
 	smp_mb();
-	hyplet_debug("offlet: hyplet assigned to cpu %d\n",cpu);
+	printk("offlet: hyplet assigned to cpu %d\n",cpu);
+
 	return 0;
 }
 
@@ -251,8 +284,6 @@ int hyplet_ctl(unsigned long arg)
 
 	if (hplt.__resource.cpu >= 0)
 			hyp = hyplet_get(hplt.__resource.cpu);
-
-	hyplet_debug("assigning to cpu  %d \n",hplt.__resource.cpu);
 
 	switch (hplt.cmd)
 	{
@@ -295,6 +326,10 @@ int hyplet_ctl(unsigned long arg)
 
 		case HYPLET_SET_RPC:
 				return hyplet_set_rpc(&hplt, hyp);
+
+		case HYPLET_WAIT:
+				 wait_for_hyplet(hyp, hplt.__resource.timeout_ms);
+				 break;
 
 	}
 	return rc;

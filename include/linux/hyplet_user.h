@@ -11,6 +11,7 @@ typedef enum {
 	   HYPLET_SET_RPC  = 7,
 	   HYPLET_IMP_TIMER = 8,
 	   OFFLET_SET_CALLBACK = 9,
+	   HYPLET_WAIT = 10,
 }hyplet_ops;
 
 
@@ -40,6 +41,7 @@ struct hyplet_ctrl {
 	union {
 		int irq;
 		int cpu;
+		int timeout_ms;
 	}__resource  __attribute__ ((packed));
 };
 

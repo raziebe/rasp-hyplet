@@ -1,6 +1,8 @@
 #ifndef __HYPLET_UTILS_H__
 #define __HYPLET_UTILS_H__
 
+#include "hyp_spinlock.h"
+
 typedef unsigned long long u64;
 typedef signed long long s64;
 static const int arm_arch_timer_reread = 1;
@@ -63,7 +65,9 @@ struct hyp_fmt {
 	double f[7];
 };
 
+
 struct hyp_state {
+	spinlock_t sync;
 	int fmt_idx;
 	struct hyp_fmt fmt[PRINT_LINES];
 };
@@ -80,6 +84,8 @@ int hyplet_assign_offlet(int cpu, void* addr);
 int hyp_print(const char *format, ...);
 int hyp_print2(struct hyp_fmt *format);
 void print_hyp(int idx);
+int hyp_wait(int cpu,int ms);
+
 
 #endif
 

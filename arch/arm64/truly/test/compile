@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# This script compiles and links and the binary
+# We do some elf parsing here because we need to know the 
+# hyplet size in advance.
+sudo kpartx -a /opt/truly/linaro_fvp/armv8.img
+#
+GCC=gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu
+CC=/opt/${GCC}/bin/aarch64-linux-gnu-gcc 
+READELF=/opt/${GCC}/bin/aarch64-linux-gnu-readelf
+OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
+
+# simple isr hyplet
+#$CC   -I ../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
+#$CC   -I ../../../../include offlet_hyplet.c hyplet_utils.c -o offlet1
+#$CC   -I ../../../../include offlet_timer.c hyplet_utils.c -o timer
+$CC   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utils.S  -o offprint
+
+
+sudo mount /dev/mapper/loop0p2 /media/fvp
+#sudo cp uprint /media/fvp//home/root/
+sudo cp offprint /media/fvp//home/root/offprint
+sudo umount /media/fvp

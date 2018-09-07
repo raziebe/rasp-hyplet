@@ -35,6 +35,16 @@ hyp_print2:
    fmov d1, x9
    ldr x9,  [x29, 200]
    fmov d2, x9
+   ldr x9,  [x29, 208]
+   fmov d3, x9
+   ldr x9,  [x29, 216]
+   fmov d4, x9
+   ldr x9,  [x29, 224]
+   fmov d5, x9
+   ldr x9,  [x29, 232]
+   fmov d6, x9
+   ldr x9,  [x29, 240]
+   fmov d7, x9
 
    bl printf
 
