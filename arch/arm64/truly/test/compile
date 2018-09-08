@@ -13,5 +13,5 @@ OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
 # simple isr hyplet
 #$CC   -I ../../../../include simple_hyplet.c hyplet_utils.c -o simple_hyplet
 #$CC   -I ../../../../include offlet_hyplet.c hyplet_utils.c -o offlet1
-#$CC   -I ../../../../include offlet_timer.c hyplet_utils.c -o timer
-$CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utils.S  -o offprint
+$CC --static  -I ../../../../include offlet_timer.c hyplet_utilsS.S hyplet_utils.c -o timer
+$CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utilsS.S  -o offprint

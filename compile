@@ -1,0 +1,1 @@
+make ARCH=arm64 LOCALVERSION=-isolet CROSS_COMPILE=/opt/gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu- Image

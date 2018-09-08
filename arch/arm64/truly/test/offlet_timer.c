@@ -26,16 +26,6 @@ long user_timer(void *opaque)
 	while (hyp_gettime()  < next);
 
 	next +=  interval_ns;
-	return 0;
-}
-
-/*
-	Put whatever you want here
-*/
-long user_print(void *opaque)
-{
-	if ((iters % 10) == 0)
-		hyp_print("iters %d\n",iters);
 	iters++;
 	return 0;
 }
@@ -68,7 +58,7 @@ static int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_assign_offlet(cpu, user_print)) {
+	if (hyplet_assign_offlet(cpu, user_timer)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
@@ -92,6 +82,10 @@ int main(int argc, char *argv[])
     cpu = atoi(argv[1]);
     interval_ns = atoi(argv[2]);
 
+    rc = hyplet_drop_cpu(cpu);
+    if (rc < 0 ){
+   	printf("Failed to drop cpu%d\n",cpu);
+    }
     printf("Setting offlet to cpu %d "
 		"interval %d Version rc-1.2\n", cpu, interval_ns);
     hyplet_start();
