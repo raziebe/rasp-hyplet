@@ -1,7 +1,7 @@
 TARGET= offletgpio
 OBJS  = offlet_gpio.o
 
-KDIR=../../../../../
+KDIR=../../../../../../
 PWD = $(shell pwd) 
 CC=/opt/gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc
 LD=/opt/gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-ld
