@@ -163,6 +163,9 @@ int		hyplet_map_user(struct hyplet_vm *);
 void 		hyplet_offlet(unsigned int cpu);
 void		hyplet_invld_all_tlb(void);
 
+void		 offlet_register(struct hyp_wait* hypevent,int cpu);
+void		 offlet_unregister(struct hyp_wait* hypevent,int cpu);
+
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 
 

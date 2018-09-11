@@ -217,7 +217,12 @@ void hyplet_offlet(unsigned int cpu)
 
 		printk("hyplet offlet: Start run\n");
 		while (hyp->tsk != NULL) {
+			hyp->user_arg1 = 12;
+			hyp->user_arg2 = 13;
+			hyp->user_arg3 = 14;
+			hyp->user_arg4 = 15;
 			hyplet_call_hyp(hyplet_run_user);
+			printk("arg4 %ld\n",hyp->user_arg4);
 			signal_any(hyp);
 			cpu_relax();
 		}

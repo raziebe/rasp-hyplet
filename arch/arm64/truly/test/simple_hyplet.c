@@ -1,3 +1,13 @@
+/*
+
+ * user_hyplet.c
+ *
+ *  Created on: Jan 22, 2018
+ *      Author: raz
+ *
+ *      This is an example of a user hyplet
+ */
+
 #define _GNU_SOURCE
  
 #include <pthread.h>
@@ -10,28 +20,24 @@
 #include <linux/hyplet_user.h>
 #include "hyplet_utils.h"
 
-int cpu = 0;
-int interval_ns = 100000;
-int iters  = 0;
-unsigned long next = 0;
+int cpu = -1;
+int irq = 0;
+int some_global = 0;
 
 /*
-	Put whatever you want here
-*/
-long user_print(long a1,long a2,long a3,long a4)
+ * This code is executed in an hyplet context
+ */
+long user_hyplet(void *opaque)
 {
-	hyp_print("iters %d a=%ld,%ld,%ld,%ld\n",
-		iters, a1, a2, a3, a4);
-	iters++;
-	return 0;
+	some_global++;
 }
+
 
 static int hyplet_start(void)
 {
 	int rc;
 	int stack_size = sysconf(_SC_PAGESIZE) * 50;
 	void *stack_addr;
-
 	/*
 	 * Create a stack
 	 */
@@ -47,14 +53,19 @@ static int hyplet_start(void)
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
-	
+
 	if (hyplet_set_stack(stack_addr, stack_size, cpu)) {
 		fprintf(stderr, "hyplet: Failed to map a stack\n");
 		return -1;
 	}
 
-	if (hyplet_assign_offlet(cpu, user_print)) {
+	if (hyplet_set_callback(user_hyplet, cpu)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
+		return -1;
+	}
+// begin trapping
+	if (hyplet_trap_irq(irq, cpu)) {
+		printf("hyplet: Failed to map user's data\n");
 		return -1;
 	}
 
@@ -67,28 +78,17 @@ static int hyplet_start(void)
 */
 int main(int argc, char *argv[])
 {
-    int i;
-    int rc;
+	int rc;
 
-    if (argc <= 1){
-        printf("%s <cpu>\n",argv[0]);
+    if (argc <= 1 ){
+        puts("hyplet: must supply an irq , "
+                        "please look in /proc/interrupts\n");
         return -1;
     }
-   
-    cpu = atoi(argv[1]);
-    if (hyplet_drop_cpu(cpu) < 0 ){
-		printf("Failed to drop processor\n");
-		return -1;
-    }
 
+    irq = atoi(argv[1]);
     hyplet_start();
-    printf("Waiting for offlet %d for 100 useconds\n",cpu);
-
-    
-    for (;i < 100; i++) {
-	print_hyp();
-    	hyp_wait(cpu, 100);
-    }
+    printf("Waiting for irq %d for 20 seconds\n",irq);
+    sleep(20);
+    printf("some global %d\n",some_global);
 }
-
-

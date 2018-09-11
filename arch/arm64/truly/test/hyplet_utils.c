@@ -210,7 +210,7 @@ int hyp_wait(int cpu,int ms)
 /*
  * hyp_strlen and others can be refrained by statiticly linking
 */
-size_t strlen(const char *str)
+size_t hyp_strlen(const char *str)
 {
 	int i = 0;
 
@@ -238,7 +238,7 @@ char* hyp_strncpy(char *dst, const char *src,int n)
 	return &dst[0];
 }
 
-char* strcpy(char *dst, const char *src)
+char* hyp_strcpy(char *dst, const char *src)
 {
 	int i = 0;
 	int len;
@@ -258,7 +258,7 @@ int hyp_print(const char *fmt, ...)
      int i = 0,f = 0;
      int idx = hypstate.fmt_idx;
 
-     memcpy(&hypstate.fmt[idx].fmt[0], fmt, strlen(fmt) );
+     hyp_memcpy(&hypstate.fmt[idx].fmt[0], fmt, hyp_strlen(fmt) );
 
      va_start(ap, fmt);
      while (*fmt) {

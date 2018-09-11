@@ -308,20 +308,23 @@ ENTRY(hyplet_run_user)
 /* sp_el0 is the kernel's current */
 	mrs  x0,sp_el0
 	push x0, xzr
-	mrs	 x0, tpidr_el2
+	mrs	 x9, tpidr_el2
 
 	mrs		x1, elr_el2
-	str		x1, [x0, HYPLET_ELR_EL2]
+	str		x1, [x9, HYPLET_ELR_EL2]
 
-	ldr		x1, [x0, HYPLET_STACK]
+	ldr		x1, [x9, HYPLET_STACK]
 	msr		sp_el0,x1
-	ldr		x30,[x0, HYPLET_CODE]
-
+	ldr		x30,[x9, HYPLET_CODE]
+	ldr		x0,[x9,#HYPLET_ARG1]
+	ldr		x1,[x9,#HYPLET_ARG2]
+	ldr		x2,[x9,#HYPLET_ARG3]
+	ldr		x3,[x9,#HYPLET_ARG4]
 
 /*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
-	mrs 	 x1, spsel
-	and 	 w1,w1,#0xFFFFFFFE
-	msr  	 spsel,x1
+	mrs 	 x9, spsel
+	and 	 w9,w9,#0xFFFFFFFE
+	msr  	 spsel,x9
 
 	blr 	x30 // Execute hyplet in EL2
 /*
