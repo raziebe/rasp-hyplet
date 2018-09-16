@@ -161,14 +161,14 @@ void hyplet_reset(struct task_struct *tsk)
 
 static void signal_any(struct hyplet_vm *hyp)
 {
-	unsigned long flags;
+    unsigned long flags;
     struct hyp_wait *tmp;
 
     spin_lock_irqsave(&hyp->lst_lock, flags);
 
     list_for_each_entry(tmp, &hyp->callbacks_lst, next) {
-		tmp->offlet_action(hyp, tmp);
-	}
+	tmp->offlet_action(hyp, tmp);
+    }
     spin_unlock_irqrestore(&hyp->lst_lock, flags);
 }
 
@@ -176,6 +176,37 @@ static void offlet_wake(struct hyplet_vm *hyp,struct hyp_wait* hypevent)
 {
 	wake_up_interruptible(&hypevent->wait_queue);
 }
+
+/*
+ * called from a kernel driver context
+*/
+void offlet_register(struct hyp_wait* hypeve,int cpu)
+{
+	unsigned long flags;
+	struct hyplet_vm *hyp;
+
+	hyp = hyplet_get(cpu);
+	spin_lock_irqsave(&hyp->lst_lock, flags);
+	list_add(&hypeve->next, &hyp->callbacks_lst);
+	spin_unlock_irqrestore(&hyp->lst_lock, flags);
+}
+EXPORT_SYMBOL_GPL(offlet_register);
+
+/*
+ * called from a kernel driver context
+*/
+void offlet_unregister(struct hyp_wait* hypeve,int cpu)
+{
+	unsigned long flags;
+	struct hyplet_vm *hyp;
+
+	hyp = hyplet_get(cpu);
+	
+	spin_lock_irqsave(&hyp->lst_lock, flags);
+	list_del(&hypeve->next);
+	spin_unlock_irqrestore(&hyp->lst_lock, flags);
+}
+EXPORT_SYMBOL_GPL(offlet_unregister);
 
 static void wait_for_hyplet(struct hyplet_vm *hyp,int ms)
 {
@@ -217,12 +248,7 @@ void hyplet_offlet(unsigned int cpu)
 
 		printk("hyplet offlet: Start run\n");
 		while (hyp->tsk != NULL) {
-			hyp->user_arg1 = 12;
-			hyp->user_arg2 = 13;
-			hyp->user_arg3 = 14;
-			hyp->user_arg4 = 15;
 			hyplet_call_hyp(hyplet_run_user);
-			printk("arg4 %ld\n",hyp->user_arg4);
 			signal_any(hyp);
 			cpu_relax();
 		}
