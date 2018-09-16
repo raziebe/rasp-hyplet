@@ -6,38 +6,41 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-
 #include <linux/hyplet_user.h>
+
 #include "hyplet_utils.h"
 
-int interval_ns = 100000;
+static long interval_us = 5000000;
 static int cpu = 1;
 static int sample  = 0;
-static long next_ns = 0;
-#define SAMPLES_NR	10
+static long next_us = 0;
 
-long times[SAMPLES_NR][2]; 
+
+#define SAMPLES_NR	10
+long times[SAMPLES_NR][3];
+
 /*
  * read the value from the offlet.	
 */
 long user_print(long a1,long a2,long a3,long a4)
 {
-	if (next_ns == 0) {
-		next_ns = hyp_gettime() + interval_ns;
-		return 0;
+	if (next_us == 0) {
+		next_us = hyp_gettime_us() + interval_us;
 	}
 
-	hyp_print("array [%ld,%ld = %ld]\n",
-		 a1, a2, a2 - a1);
+//	hyp_print("array [%ld,%ld = %ld]\n",
+//		 a1, a2, a2 - a1);
 
-	while (hyp_gettime()  < next_ns);
+	if (sample < SAMPLES_NR) {
+		times[sample][0] = a1;
+		times[sample][1] = a2;
+		times[sample][2] = a3;
+		sample++;
+	}
 
-	next_ns +=  interval_ns;
+	while ( hyp_gettime_us()  < next_us);
 
-	if (sample > SAMPLES_NR )
-		return 0;
-	times[sample][0]   = a1;
-	times[sample++][1] = a2;
+	next_us = hyp_gettime_us() + interval_us;
 	return 0;
 }
 
@@ -98,12 +101,11 @@ int main(int argc, char *argv[])
 
     hyplet_start();
     printf("Waiting for offlet %d for 100 useconds\n",cpu);
-
     
-    for (;i < 10; i++) {
-	print_hyp();
-    	sleep(1);
+    for (i = 0; i < SAMPLES_NR; i++) {
+    	sleep(5);
+	printf("%d:%ld rc=%d\n",
+		sample, times[i][1] - times[i][0],times[i][2]);
     }
 }
-
 
