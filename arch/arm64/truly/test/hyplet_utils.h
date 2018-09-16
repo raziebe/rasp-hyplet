@@ -45,6 +45,10 @@ static inline u64 hyp_gettime() {
 	return t * CLOCK_DIVISOR;
 }
 
+static inline u64 hyp_gettime_us() {
+	return hyp_gettime()/1000;
+}
+
 static inline long cntvoff_el2(void)
 {
 	long val;
