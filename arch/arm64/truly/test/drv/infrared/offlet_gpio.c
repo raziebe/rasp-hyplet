@@ -15,55 +15,89 @@
 
 /*
  * must export before use.
- * and give a direction
-* echo 475 > /sys/class/gpio/export
+* and give a direction
+* echo 485 > /sys/class/gpio/export
 * echo out > /sys/class/gpio/gpio475/direction
+* echo 475 > /sys/class/gpio/export
+* echo in > /sys/class/gpio/gpio475/direction
 */
-static int toggle = 0;
 struct hyp_wait hypeve;
 
-static int gpio;
-module_param(gpio, int, 0);
+static int gpio_w = 485;
+module_param(gpio_w, int, 0 );
 
-static int cpu;
-module_param(cpu, int, 0) ;
+static int gpio_r = 475;
+module_param(gpio_r, int, 0);
 
-static int dir;
-module_param(dir, int, 0) ;
+static int cpu = 1;
+module_param(cpu, int, 0);
 
-static void offlet_cleanup(void) 
+void trig_off(void)
 {
-	offlet_unregister(&hypeve,cpu);
-	printk( "driver exit\n");
+	gpio_set_value(gpio_w, 0);
 }
 
-/*
- * callback in an offlet context 
-*/
-static void write_gpio(struct hyplet_vm *hyp,struct hyp_wait* hypevent)
-{
-	gpio_set_value(gpio, toggle);
-	toggle = !toggle;
-}
-
-static void read_gpio(struct hyplet_vm *hyp,struct hyp_wait* hypevent)
+void wait_for_blackness(void)
 {
 	int rc;
-	rc = gpio_get_value(gpio);
-	hyp->user_arg1 = rc;		
+
+write_again:
+	trig_off();
+	rc = gpio_get_value(gpio_r);
+	if (rc == 1)
+		goto write_again;	
+}
+
+static void offlet_trigger(struct hyplet_vm *hyp, struct hyp_wait *hypevent)
+{
+	int i = 0;
+	long t1 = 0 ,t2 = 0;
+	int rc = 0;
+	
+	hyp->user_arg1 =0;
+	hyp->user_arg2 =0;
+
+	wait_for_blackness();
+// trigger on.
+	t1 = cycles_ns();
+	gpio_set_value(gpio_w, 1);
+
+	for (i = 0; i < 100000 && rc == 0; i++){
+		rc = gpio_get_value(gpio_r);
+		if (rc==0)
+			udelay(50);
+	}
+	t2 = cycles_ns();
+	hyp->user_arg1 = t1;
+	hyp->user_arg2 = t2;
+	hyp->user_arg3 = rc;
 }
 
 static int offlet_init(void)
 {
-	if (dir == 0) 
-		hypeve.offlet_action =  write_gpio;
-	else
-		hypeve.offlet_action =  read_gpio;
-	
-	printk("GPIP: action %s \n",dir == 0 ? "write" : "read");
+	hypeve.offlet_action =  offlet_trigger;
+
+	printk("offlet:  trigger on cpu %d\n"
+			"gpios: %d %d\n",
+			cpu, gpio_w, gpio_r);
+
+//	gpio_request(gpio_w,"gpio485");
+//	gpio_request(gpio_r,"gpio475");
+//	gpio_direction_input(gpio_r);	
+//	gpio_direction_output(gpio_w, 0);	
+
 	offlet_register(&hypeve, cpu);
 
 	return 0;
+}
+
+static void offlet_cleanup(void) 
+{
+//	gpio_free(gpio_w);
+//	gpio_free(gpio_r);
+
+	offlet_unregister(&hypeve,cpu);
+	printk( "offlet exit\n");
 }
 
 module_init(offlet_init);
