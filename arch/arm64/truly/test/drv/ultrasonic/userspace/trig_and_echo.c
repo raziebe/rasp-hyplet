@@ -18,7 +18,7 @@ static inline long cycles_us(void)
 {
 	struct timeval t;
 
-	gettimeofday(&t);
+	gettimeofday(&t, NULL);
 	return t.tv_sec * 1000000 + t.tv_usec;
 }
 
@@ -33,7 +33,7 @@ int trig(char *onoff)
 		return -1;
 	}
 	
-	b = write(fd, onoff, 2);
+	b = write(fd, onoff, 3);
 	if (b < 0){
 		perror("write:");
 		return -1;
@@ -57,14 +57,14 @@ wait:
         }
 
         b = read(fd, buf, sizeof(buf));
-        if (b < 0){
+        if (b <= 0){
                 perror("read:");
                 close(fd);
                 goto wait;
         }
+	t = cycles_us();
         close(fd);
-        if (buf[0] != c) {
-		t = cycles_us();
+        if (buf[0] == c) {
                 goto wait;
         }
 	return t;
@@ -74,31 +74,36 @@ int main(int argc,char *argv[])
 {
 	int i;
 	int sleep_us;
-	long s, e, dt_ms, tmp;
-	float supersonic_speed_ms = 343;// centimeter/milli;	
+	long s, e, dt_us, tmp;
+	float supersonic_speed_us = 0.0343;// centimeter/microsecond;	
 	float distance;
 
 	if (argc < 2) {
 		printf("%s <wait time us>\n",argv[0]);
 		return -1;
 	}
-	
+
 	sleep_us = atoi(argv[1]);
 	trig("1\n");
+
 	// wait trigger
 	usleep(sleep_us);
+
 	trig("0\n");
 	s =  cycles_us();
+
 	tmp = wait_echo('0');
 	if (tmp != 0)
 		s = tmp;
+	e =  cycles_us();
 	tmp  = wait_echo('1');
 	if (tmp != 0)
 		e = tmp;
-	dt_ms = (e - s)/1000000;
 
-	distance  = ((float)dt_ms * supersonic_speed_ms)/2;
+	dt_us = (e - s);
+
+	distance  = ((float)dt_us * supersonic_speed_us)/2;
 	
-	printf("distance %f cm dt=%ld (e-s)=%ld\n",
-		distance, dt_ms, e-s);
+	printf("distance %fcm dt=%ld\n",
+		distance, dt_us);
 }
