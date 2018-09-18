@@ -10,9 +10,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-const char *gpio475="/sys/class/gpio/gpio475/value"; // the trigger
-const char *gpio485="/sys/class/gpio/gpio485/value"; // the echo
-
+const char *gpio475="/sys/class/gpio/gpio17/value"; // the trigger
+const char *gpio485="/sys/class/gpio/gpio27/value"; // the echo
 
 static inline long cycles_us(void)
 {

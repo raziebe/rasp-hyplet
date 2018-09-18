@@ -59,6 +59,7 @@ wait:
 		close(fd);
 		goto wait;
 	}
+	close(fd);
 }
 
 int main(int argc,char *argv[])
