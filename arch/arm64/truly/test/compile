@@ -15,3 +15,4 @@ $CC --static  -I ../../../../include offlet_timer.c hyplet_utilsS.S hyplet_utils
 $CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utilsS.S  -o offprint
 $CC --static   -I ../../../../include iar_recv2.c hyplet_utils.c  hyplet_utilsS.S  -o iar_rcv_offlet2 
 
+$CC --static   -I ../../../../include ultrasonic_hyplet.c hyplet_utils.c  hyplet_utilsS.S  -o  ultrasonic_hyplet

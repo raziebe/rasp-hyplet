@@ -313,5 +313,9 @@ static void __print_hyp(int idx) {
 
 void print_hyp(void) 
 {
-	__print_hyp(hypstate.fmt_idx);
+        int idx = 0;
+
+	if (hypstate.fmt_idx > 0)
+        	idx = (hypstate.fmt_idx - 1) % PRINT_LINES;
+	__print_hyp(idx);
 }

@@ -10,14 +10,14 @@
 
 #include "hyplet_utils.h"
 
-static long interval_us = 5000000;
+static long interval_us = 1000000;
 static int cpu = 1;
 static int sample  = 0;
 static long next_us = 0;
 static int run = 1;
 
 
-#define SAMPLES_NR	10
+#define SAMPLES_NR  20
 long times[SAMPLES_NR][3];
 
 /*
@@ -25,20 +25,19 @@ long times[SAMPLES_NR][3];
 */
 long user_print(long a1,long a2,long a3,long a4)
 {
+	long dt_us;
+	float supersonic_speed_us = 0.0343;// centimeter/microsecond;
+	float distance;
 
 	if (next_us == 0) {
 		next_us = hyp_gettime_us() + interval_us;
 	}
+	
+	dt_us = (a2 - a1)/1000;
+	distance  = ((float)dt_us * supersonic_speed_us)/2;
 
-//	hyp_print("array [%ld,%ld = %ld]\n",
-//		 a1, a2, a2 - a1);
-
-	if (sample < SAMPLES_NR) {
-		times[sample][0] = a1;
-		times[sample][1] = a2;
-		times[sample][2] = a3;
-		sample++;
-	}
+	hyp_print("#%d distance %f dt=%ld a2=%ld\n",
+			 sample++, distance, dt_us,a2);
 
 	while ( hyp_gettime_us()  < next_us && run );
 
@@ -105,10 +104,12 @@ int main(int argc, char *argv[])
     printf("Waiting for offlet %d for 100 useconds\n",cpu);
     
     for (i = 0; i < SAMPLES_NR; i++) {
-    	sleep(5);
-	printf("%d:%ld rc=%d\n",
-		sample, times[i][1] - times[i][0],times[i][2]);
+    	sleep(1);
+	print_hyp();
+//	printf("#%d: dt=%ld \n",
+//		sample, (times[i][1] - times[i][0])/1000);
     }
     run  = 0;
+    sleep(1);
 }
 
