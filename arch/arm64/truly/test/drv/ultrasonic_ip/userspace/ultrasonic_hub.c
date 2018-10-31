@@ -20,8 +20,8 @@
 #define  USONIC_TRIG_END	7
 #define  USONIC_BIT_DONE	8
 
-#define  DELAY_1_BIT 200000
-#define  DELAY_0_BIT 100000
+#define  DELAY_1_BIT 20000
+#define  DELAY_0_BIT 10000
 
 
 static int cpu = 1;
@@ -29,6 +29,7 @@ static int run = 1;
 static int state = USONIC_TRIG_START;
 static int bit = 0;
 static long echo_start_ns = 0;
+static long echo_end_ns = 0;
 
 /*
     Return value is broken to:
@@ -71,28 +72,32 @@ bit_start:
 
 		state = USONIC_ECHO_START; 
 		while (hyp_gettime() < end && run);
-		return  USONIC_TRIG ; // Start or End the trigger
+		return  USONIC_TRIG ; // End Bit transmit
 	}
 
 	if (state == USONIC_ECHO_START){
 		state = USONIC_ECHO_END;
-		echo_start_ns = hyp_gettime();
-		// wait ECHO 0
+		// wait untill echo changes to ECHO 1
 		return  USONIC_ECHO;
 	}
 
 	if (state == USONIC_ECHO_END){
 		char cmd = USONIC_ECHO;
 		short cmd_val = ((short)1 << 8) ;
-		// wait until echo would reset back to 1, bug : wait forever ?
+		// Save the time of transition from 0 to 1
+		echo_start_ns = time_ns;
+		// wait until echo would reset back to 0, bug : wait forever ?
 		long rc = cmd_val | cmd;
 		state = USONIC_BIT_DONE;
+
 		return rc;
 	}
 
 	if (state == USONIC_BIT_DONE) {
-		hyp_print("dt us = %ld bit=%d\n", (time_ns - echo_start_ns)/1000, bit);
-		bit = !bit; /* 1010101...*/
+		// Save the time of transition from 1 to 0
+		echo_end_ns = time_ns;
+		hyp_print("dt us = %ld bit=%d\n", (echo_end_ns - echo_start_ns)/1000, bit);
+	//	bit = !bit; /* 1010101...*/
 		state = USONIC_TRIG_START;
 		goto bit_start;
 	}
