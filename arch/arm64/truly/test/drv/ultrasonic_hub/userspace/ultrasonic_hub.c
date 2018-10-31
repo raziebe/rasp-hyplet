@@ -20,10 +20,9 @@
 #define  USONIC_TRIG_END	7
 #define  USONIC_BIT_DONE	8
 
-#define  DELAY_1_BIT 20000
-#define  DELAY_0_BIT 10000
-
-
+static int iter = 1;
+static int bit1_delay = 0;
+static int bit0_delay = 0;
 static int cpu = 1;
 static int run = 1;
 static int state = USONIC_TRIG_START;
@@ -66,9 +65,9 @@ bit_start:
 		long end = 0;
 		//  End the transmit, according to bit value
 		if (bit == 0)
-			end = time_ns + DELAY_0_BIT;
+			end = time_ns + bit0_delay;
 		if (bit == 1)
-			end = time_ns + DELAY_1_BIT;
+			end = time_ns + bit1_delay;
 
 		state = USONIC_ECHO_START; 
 		while (hyp_gettime() < end && run);
@@ -96,7 +95,9 @@ bit_start:
 	if (state == USONIC_BIT_DONE) {
 		// Save the time of transition from 1 to 0
 		echo_end_ns = time_ns;
-		hyp_print("dt us = %ld bit=%d\n", (echo_end_ns - echo_start_ns)/1000, bit);
+		hyp_print("#%d us = %ld bit=%d\n", 
+			iter++,
+			(echo_end_ns - echo_start_ns)/1000, bit);
 	//	bit = !bit; /* 1010101...*/
 		state = USONIC_TRIG_START;
 		goto bit_start;
@@ -149,26 +150,34 @@ int main(int argc, char *argv[])
     int i;
     int rc;
 
-    if (argc <= 1){
-        printf("%s <cpu>\n",argv[0]);
+    if (argc <= 2){
+        printf("%s <cpu> <bit1 delay us>\n",argv[0]);
         return -1;
     }
    
     cpu = atoi(argv[1]);
+    bit0_delay = atoi(argv[2]);
+    
+    if (bit0_delay < 0 || bit0_delay > 400) {
+	printf("must provide a sane bit delay");
+	return 0;
+    }
+    
+    bit0_delay *= 1000; // to nanosecond
+    bit1_delay = bit0_delay;
+ 
     if (hyplet_drop_cpu(cpu) < 0 ){
 		printf("Failed to drop processor\n");
 		return -1;
     }
-
+    printf("Cpu %d delay %d,%d\n",
+		cpu, bit1_delay, bit0_delay);
     hyplet_start();
-    printf("Waiting for offlet %d for 100 useconds\n",cpu);
-    
+ 
     while (1) {
 	    print_hyp();
 	    usleep(10000);
     }
-//	printf("#%d: dt=%ld \n",
-//		sample, (times[i][1] - times[i][0])/1000);
     run  = 0;
     sleep(1);
 }

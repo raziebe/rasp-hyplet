@@ -61,12 +61,15 @@ static inline void set_cntvoff_el2(long val)
 	asm ("msr  cntvoff_el2, %0" : "=r" (val) );
 }
 
-#define PRINT_LINES	10
-
+#define PRINT_LINES	100
+/*
+ * Never change the order of these lines 
+*/
 struct hyp_fmt {
 	char fmt[128];
 	long i[7];
 	double f[7];
+	int active;
 };
 
 

@@ -38,7 +38,7 @@ void trig(int val)
 }
 
 /*
- * Wait unti we get this echo value
+ * Wait until we don't get this echo value
 */
 long wait_echo(int val)
 {
@@ -62,16 +62,16 @@ static void offlet_trigger(struct hyplet_vm *hyp, struct hyp_wait *hypevent)
 	int cmd =      (int) ( hyp->user_arg1  & 0xFF );
 	int cmd_val =  (int) ( (hyp->user_arg1 >> 8) & 0xFF ) ;
 
-	printk("ARG1 %ld\n", hyp->user_arg1);
+//	printk("ARG1 %ld\n", hyp->user_arg1);
 	if (cmd == USONIC_TRIG) {
-		printk("USONIC TRIG %d\n",cmd_val);
+//		printk("USONIC TRIG %d\n",cmd_val);
 		trig(cmd_val);
 		hyp->user_arg1 = cycles_ns();
 		return;
 	}
 
 	if (cmd == USONIC_ECHO) {
-		printk("USONIC ECHO cmd_val=%d\n",cmd_val);
+//		printk("USONIC ECHO cmd_val=%d\n",cmd_val);
 		hyp->user_arg1 = wait_echo(cmd_val);
 		return;
 	}
