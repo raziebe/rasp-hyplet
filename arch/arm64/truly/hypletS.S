@@ -327,6 +327,9 @@ ENTRY(hyplet_run_user)
 	msr  	 spsel,x9
 
 	blr 	x30 // Execute hyplet in EL2
+/* save return value */
+	mrs	 x9, tpidr_el2
+	str	 x0,[x9,#HYPLET_ARG1]
 /*
  * switch stacks back
 */

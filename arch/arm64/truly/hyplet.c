@@ -228,12 +228,15 @@ static void wait_for_hyplet(struct hyplet_vm *hyp,int ms)
 	spin_unlock_irqrestore(&hyp->lst_lock, flags);
 }
 
+/*
+ * Main offlet here.
+*/
 void hyplet_offlet(unsigned int cpu)
 {
 	struct hyplet_vm *hyp;
 
 	hyp = hyplet_get_vm();
-	printk("offlet : Enter %d\n",cpu);
+	printk("Hyplet offlet : Enter %d\n",cpu);
 
 	while (hyp->state & HYPLET_OFFLINE_ON) {
 		/*
@@ -246,18 +249,15 @@ void hyplet_offlet(unsigned int cpu)
 
 		hyp->state |= HYPLET_OFFLINE_RUN;
 
-		printk("hyplet offlet: Start run\n");
 		while (hyp->tsk != NULL) {
 			hyplet_call_hyp(hyplet_run_user);
 			signal_any(hyp);
-			cpu_relax();
 		}
 		hyplet_free_mem(hyp);
 		hyp->state &= ~(HYPLET_OFFLINE_RUN);
 		smp_mb();
-		printk("hyplet offlet : Ended\n");
 	}
-	printk("offlet : Exit %d\n",cpu);
+	printk("hyplet offlet : Exit %d\n",cpu);
 }
 
 int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
