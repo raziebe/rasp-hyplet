@@ -20,35 +20,22 @@
 #define  USONIC_TRIG_END	7
 #define  USONIC_BIT_DONE	8
 
+static int usonic_mode  = USONIC_ECHO;
 static int iter = 1;
 static int bit1_delay = 0;
 static int bit0_delay = 0;
 static int cpu = 1;
 static int run = 1;
-static int state = USONIC_TRIG_START;
+static int state = 0;
 static int bit = 0;
 static long echo_start_ns = 0;
 static long echo_end_ns = 0;
-
-/*
-    Return value is broken to:
-	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
-	long  cmd_val:8; // echo/trig 1 or 0
-	long  pad:48;	
-*/
+float supersonic_speed_us = 0.0343;// centimeter/microsecond;	
 
 
-/* Local Send/Receive Tester
- * The kerne offlet act upton our command.
- * It may trigger an echo or end an echo.
- * It may start an echo read.
-*/
-long user_print(long time_ns,long a2,long a3,long a4)
+long usonic_trig(long time_ns)
 {
-bit_start:	
-	if (!run){
-		return 0;
-	}
+	long end = 0;
 
 	if (state == USONIC_TRIG_START){
 		char cmd = USONIC_TRIG;
@@ -57,22 +44,31 @@ bit_start:
 
 		// Start bit transmit
 		state = USONIC_TRIG_END; 
-		
 		return rc;
 	}
 
 	if (state == USONIC_TRIG_END){
-		long end = 0;
 		//  End the transmit, according to bit value
 		if (bit == 0)
 			end = time_ns + bit0_delay;
 		if (bit == 1)
 			end = time_ns + bit1_delay;
 
-		state = USONIC_ECHO_START; 
+		state = USONIC_TRIG_START; 
 		while (hyp_gettime() < end && run);
-		return  USONIC_TRIG ; // End Bit transmit
+		return  USONIC_TRIG; // End Bit transmit
 	}
+	hyp_print("usonic_trig: should not be here\n");
+	return -1;
+}
+
+long usonic_echo(long time_ns)
+{
+	long end = 0;
+
+echo_start:
+	if (!run)
+		return 0;
 
 	if (state == USONIC_ECHO_START){
 		state = USONIC_ECHO_END;
@@ -93,17 +89,48 @@ bit_start:
 	}
 
 	if (state == USONIC_BIT_DONE) {
+		float distance;
+		long dt;
 		// Save the time of transition from 1 to 0
 		echo_end_ns = time_ns;
-		hyp_print("#%d us = %ld bit=%d\n", 
-			iter++,
-			(echo_end_ns - echo_start_ns)/1000, bit);
+		dt = (echo_end_ns - echo_start_ns)/1000;
+		distance  = ((float)dt * supersonic_speed_us)/2;
+
+		hyp_print("#%d us = %ld distance=%2.2f bit=%d\n", 
+			iter++, dt, bit);
 	//	bit = !bit; /* 1010101...*/
-		state = USONIC_TRIG_START;
-		goto bit_start;
+		state = USONIC_ECHO_START;
+		goto echo_start;
 	}
 
+	hyp_print("echo should not be here\n");
 	return -1;
+}
+
+/*
+    Return value is broken to:
+	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
+	long  cmd_val:8; // echo/trig 1 or 0
+	long  pad:48;	
+*/
+
+
+/* Local Send/Receive Tester
+ * The kerne offlet act upton our command.
+ * It may trigger an echo or end an echo.
+ * It may start an echo read.
+*/
+long  usonic_transducer(long time_ns,long a2,long a3,long a4)
+{
+	switch(usonic_mode)
+	{
+		case USONIC_TRIG:
+			return usonic_trig(time_ns);
+		case USONIC_ECHO:
+			return usonic_echo(time_ns);
+	}
+	hyp_print("Usonic ilegal mode\n");
+	return 0;
 }
 
 static int hyplet_start(void)
@@ -133,7 +160,7 @@ static int hyplet_start(void)
 		return -1;
 	}
 
-	if (hyplet_assign_offlet(cpu, user_print)) {
+	if (hyplet_assign_offlet(cpu, usonic_transducer)) {
 		fprintf(stderr, "hyplet: Failed to map code\n");
 		return -1;
 	}
@@ -149,27 +176,47 @@ int main(int argc, char *argv[])
 {
     int i;
     int rc;
+    char *mode;
 
-    if (argc <= 2){
-        printf("%s <cpu> <bit1 delay us>\n",argv[0]);
+    if (argc < 4){
+        printf("%s <cpu> <bit delay us> <mode=[TRIG=1,ECHO=2]>\n",
+			argv[0]);
         return -1;
     }
-   
+
     cpu = atoi(argv[1]);
     bit0_delay = atoi(argv[2]);
-    
-    if (bit0_delay < 0 || bit0_delay > 400) {
-	printf("must provide a sane bit delay");
-	return 0;
-    }
-    
-    bit0_delay *= 1000; // to nanosecond
-    bit1_delay = bit0_delay;
+   // trig_intergap_ns = atoi(argv[3])*1000;
+    mode = argv[3];
+
+    if (!strcasecmp(mode,"trig"))
+	usonic_mode = USONIC_TRIG;    
+
+    if (!strcasecmp(mode,"echo"))
+	usonic_mode = USONIC_ECHO;    
  
-    if (hyplet_drop_cpu(cpu) < 0 ){
-		printf("Failed to drop processor\n");
-		return -1;
+    if (usonic_mode != USONIC_TRIG && usonic_mode != USONIC_ECHO){
+	printf("Ilegal mode\n");
+	return -1;
     }
+
+    if ( usonic_mode == USONIC_TRIG ) {
+	    if (bit0_delay < 0) {
+		printf("must provide a sane bit delay");
+		return 0;
+	    }
+	bit0_delay *= 1000; // to nanosecond
+	bit1_delay = bit0_delay;
+	state = USONIC_TRIG_START;
+    } else{
+	state = USONIC_ECHO_START;
+    }
+
+    if (hyplet_drop_cpu(cpu) < 0 ){
+	printf("Failed to drop processor\n");
+	return -1;
+    }
+
     printf("Cpu %d delay %d,%d\n",
 		cpu, bit1_delay, bit0_delay);
     hyplet_start();
