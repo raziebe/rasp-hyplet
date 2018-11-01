@@ -31,6 +31,11 @@ static const int arm_arch_timer_reread = 1;
 	_val; \
 })
 
+static inline void cpu_relax(void)
+{
+	asm volatile("yield" ::: "memory");
+}
+
 static inline long __cycles(void) {
 	long cval;
 	cval = ARCH_TIMER_READ("cntvct_el0"); 		
