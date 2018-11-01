@@ -84,9 +84,7 @@ static int offlet_init(void)
 	struct hyp_wait *hypeve;
 	int cpu = 0;
 
-	printk("offlet:  trigger on cpu %d\n"
-			"gpios: %d %d\n",
-			cpu, gpio_w, gpio_r);
+	printk("offlet: gpios: %d %d\n", gpio_w, gpio_r);
 
 	for_each_possible_cpu(cpu) {
 		hypeve = &per_cpu(HYPEVE, cpu);
