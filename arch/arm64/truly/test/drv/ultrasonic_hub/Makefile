@@ -1,5 +1,5 @@
 TARGET= ultrasonicnet
-OBJS  = ultrasonic_gpio.o
+OBJS  = ultrasonic_net.o
 
 KDIR=/opt/raspberry/64bit/O/
 PWD = $(shell pwd) 

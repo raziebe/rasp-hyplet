@@ -21,7 +21,7 @@
 * echo 475 > /sys/class/gpio/export
 * echo out > /sys/class/gpio/gpio475/direction
 */
-struct hyp_wait hypeve;
+DEFINE_PER_CPU(struct hyp_wait ,HYPEVE);
 
 static int gpio_r = 485;
 module_param(gpio_r, int, 0 );
@@ -81,23 +81,33 @@ static void offlet_trigger(struct hyplet_vm *hyp, struct hyp_wait *hypevent)
 
 static int offlet_init(void)
 {
-	hypeve.offlet_action =  offlet_trigger;
-	
+	struct hyp_wait *hypeve;
+	int cpu = 0;
+
 	printk("offlet:  trigger on cpu %d\n"
 			"gpios: %d %d\n",
 			cpu, gpio_w, gpio_r);
 
-	offlet_register(&hypeve, cpu);
-
+	for_each_possible_cpu(cpu) {
+		hypeve = &per_cpu(HYPEVE, cpu);
+		hypeve->offlet_action =  offlet_trigger;
+		printk("offlet registered at cpu %d\n", cpu);
+		offlet_register(hypeve, cpu);
+	}
 	return 0;
 }
 
 static void offlet_cleanup(void) 
 {
+	int cpu = 0;
+	struct hyp_wait *hypeve;
+
 //	gpio_free(gpio_w);
 //	gpio_free(gpio_r);
-
-	offlet_unregister(&hypeve,cpu);
+	for_each_possible_cpu(cpu) {
+		hypeve = &per_cpu(HYPEVE, cpu);
+		offlet_unregister(hypeve, cpu);
+	}
 	printk( "offlet exit\n");
 }
 
