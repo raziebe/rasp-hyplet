@@ -10,8 +10,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-const char *gpio475="/sys/class/gpio/gpio17/value"; // the trigger
-const char *gpio485="/sys/class/gpio/gpio27/value"; // the echo
+const char *gpio475="/sys/class/gpio/gpio475/value"; // the trigger
+const char *gpio485="/sys/class/gpio/gpio485/value"; // the echo
 
 static inline long cycles_us(void)
 {
@@ -81,28 +81,31 @@ int main(int argc,char *argv[])
 		printf("%s <wait time us>\n",argv[0]);
 		return -1;
 	}
-
-	sleep_us = atoi(argv[1]);
-	trig("1\n");
-
-	// wait trigger
-	usleep(sleep_us);
-
-	trig("0\n");
-	s =  cycles_us();
-
-	tmp = wait_echo('0');
-	if (tmp != 0)
-		s = tmp;
-	e =  cycles_us();
-	tmp  = wait_echo('1');
-	if (tmp != 0)
-		e = tmp;
-
-	dt_us = (e - s);
-
-	distance  = ((float)dt_us * supersonic_speed_us)/2;
 	
-	printf("distance %fcm dt=%ld\n",
-		distance, dt_us);
+	sleep_us = atoi(argv[1]);
+	while(1) {
+		trig("1\n");
+
+		// wait trigger
+		usleep(sleep_us);
+
+		trig("0\n");
+		s =  cycles_us();
+
+		tmp = wait_echo('0');
+		if (tmp != 0)
+			s = tmp;
+		e =  cycles_us();
+		tmp  = wait_echo('1');
+		if (tmp != 0)
+			e = tmp;
+
+		dt_us = (e - s);
+
+		distance  = ((float)dt_us * supersonic_speed_us)/2;
+		
+		printf("distance %fcm dt=%ld\n",
+			distance, dt_us);
+		sleep(1);
+	}
 }

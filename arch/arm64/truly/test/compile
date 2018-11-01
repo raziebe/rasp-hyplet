@@ -9,6 +9,7 @@ GCC=gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu
 CC=/opt/${GCC}/bin/aarch64-linux-gnu-gcc 
 READELF=/opt/${GCC}/bin/aarch64-linux-gnu-readelf
 OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
+STRIP=/opt/${GCC}/bin/aarch64-linux-gnu-strip
 
 # simple isr hyplet
 $CC --static  -I ../../../../include offlet_timer.c hyplet_utilsS.S hyplet_utils.c -o timer
@@ -16,3 +17,4 @@ $CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_util
 $CC --static   -I ../../../../include iar_recv2.c hyplet_utils.c  hyplet_utilsS.S  -o iar_rcv_offlet2 
 
 $CC --static   -I ../../../../include ultrasonic_hyplet.c hyplet_utils.c  hyplet_utilsS.S  -o  ultrasonic_hyplet
+$STRIP ultrasonic_hyplet
