@@ -6,6 +6,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <linux/hyplet_user.h>
 
 #include "hyplet_utils.h"
@@ -19,44 +23,69 @@
 #define  USONIC_TRIG_START	6
 #define  USONIC_TRIG_END	7
 #define  USONIC_BIT_DONE	8
+#define  USONIC_GPIO_NR		3
 
+static int usonic_gpio_idx_max = 1;
+static int usonic_gpio[USONIC_GPIO_NR];
 static int usonic_mode  = USONIC_ECHO;
 static int iter = 1;
 static int bit1_delay = 0;
 static int bit0_delay = 0;
 static int cpu = 1;
 static int run = 1;
-static int state = 0;
+static int usonic_state = 0;
 static int bit = 0;
 static long echo_start_ns = 0;
 static long echo_end_ns = 0;
 float supersonic_speed_us = 0.0343;// centimeter/microsecond;	
 
+static int get_trig_gpio(void)
+{
+	static int curr_gpio_idx = 0;
+	curr_gpio_idx = (curr_gpio_idx+1) % usonic_gpio_idx_max;
+	return usonic_gpio[curr_gpio_idx];
+}
 
+static int get_echo_gpio(void)
+{
+	return usonic_gpio[0];
+}
+
+/*
+    Return value is broken to:
+	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
+	long  cmd_val:8; // echo/trig 1 or 0
+	long   gpio:8;
+	long  pad:40;	
+*/
 long usonic_trig(long time_ns)
 {
 	long end = 0;
+	long rc;
+	int g = get_trig_gpio() << 16;
 
-	if (state == USONIC_TRIG_START){
+	if (usonic_state == USONIC_TRIG_START){
 		char cmd = USONIC_TRIG;
 		short cmd_val = ((short)1 << 8) ;
-		long rc = cmd_val | cmd;
 
+		rc = cmd_val | cmd | g;
+		
 		// Start bit transmit
-		state = USONIC_TRIG_END; 
+		usonic_state = USONIC_TRIG_END; 
 		return rc;
 	}
 
-	if (state == USONIC_TRIG_END){
+	if (usonic_state == USONIC_TRIG_END){
 		//  End the transmit, according to bit value
 		if (bit == 0)
 			end = time_ns + bit0_delay;
 		if (bit == 1)
 			end = time_ns + bit1_delay;
 
-		state = USONIC_TRIG_START; 
+		usonic_state = USONIC_TRIG_START; 
 		while (hyp_gettime() < end && run);
-		return  USONIC_TRIG; // End Bit transmit
+		rc = USONIC_TRIG | g;
+		return   rc;// End Bit transmit
 	}
 	hyp_print("usonic_trig: should not be here\n");
 	return -1;
@@ -65,30 +94,33 @@ long usonic_trig(long time_ns)
 long usonic_echo(long time_ns)
 {
 	long end = 0;
+	long rc;
+	int g = (get_echo_gpio() << 16);
 
 echo_start:
 	if (!run)
 		return 0;
 
-	if (state == USONIC_ECHO_START){
-		state = USONIC_ECHO_END;
+	if (usonic_state == USONIC_ECHO_START){
+		usonic_state = USONIC_ECHO_END;
 		// wait untill echo changes to ECHO 1
-		return  USONIC_ECHO;
+		rc =  USONIC_ECHO | g;
+		return rc;
 	}
 
-	if (state == USONIC_ECHO_END){
+	if (usonic_state == USONIC_ECHO_END){
 		char cmd = USONIC_ECHO;
 		short cmd_val = ((short)1 << 8) ;
 		// Save the time of transition from 0 to 1
 		echo_start_ns = time_ns;
 		// wait until echo would reset back to 0, bug : wait forever ?
-		long rc = cmd_val | cmd;
-		state = USONIC_BIT_DONE;
+		rc = cmd_val | cmd | g;
+		usonic_state = USONIC_BIT_DONE;
 
 		return rc;
 	}
 
-	if (state == USONIC_BIT_DONE) {
+	if (usonic_state == USONIC_BIT_DONE) {
 		float distance;
 		long dt;
 		// Save the time of transition from 1 to 0
@@ -96,23 +128,16 @@ echo_start:
 		dt = (echo_end_ns - echo_start_ns)/1000;
 		distance  = ((float)dt * supersonic_speed_us)/2;
 
-		hyp_print("#%d us = %ld distance=%2.2f bit=%d\n", 
-			iter++, dt, bit);
+		hyp_print("#%d us = %ld distance=%f bit=%d\n", 
+			iter++, dt, distance, bit);
 	//	bit = !bit; /* 1010101...*/
-		state = USONIC_ECHO_START;
+		usonic_state = USONIC_ECHO_START;
 		goto echo_start;
 	}
 
 	hyp_print("echo should not be here\n");
 	return -1;
 }
-
-/*
-    Return value is broken to:
-	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
-	long  cmd_val:8; // echo/trig 1 or 0
-	long  pad:48;	
-*/
 
 
 /* Local Send/Receive Tester
@@ -168,26 +193,82 @@ static int hyplet_start(void)
 	return 0;
 }
 
-/*
- * it is essential affine the program to the same 
- * core where it runs.
-*/
-int main(int argc, char *argv[])
+
+int open_gpio(int _gpio,char *dir)
 {
-    int i;
-    int rc;
-    char *mode;
+	int fd;
+	int b;
+	char gpio[128];
+	char* export = "/sys/class/gpio/export";
 
-    if (argc < 4){
-        printf("%s <cpu> <bit delay us> <mode=[TRIG=1,ECHO=2]>\n",
+	fd = open(export, O_WRONLY);
+	if (fd < 0){
+		perror("Failed to open gpio485 file");
+		return -1;
+	}
+
+	sprintf(gpio,"%d",_gpio);
+	b = write(fd, gpio, strlen(gpio));
+	if (b < 0){
+		perror("write:");
+		return -1;
+	}
+	close(fd);
+
+	sprintf(gpio, "/sys/class/gpio/gpio%d/direction",_gpio);
+
+	fd = open(gpio, O_WRONLY);
+	if (fd < 0){
+		perror("Failed to open %d file");
+		return -1;
+	}
+
+	b = write(fd, dir, strlen(dir));
+	if (b < 0){
+		perror("write:");
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+
+int help(int argc, char *argv[])
+{
+        printf("%s -c <cpu> -t [bit delay us] -m <mode>(TRIG,ECHO) -g <gpio>\n",
 			argv[0]);
-        return -1;
-    }
+	exit(0);
+}
 
-    cpu = atoi(argv[1]);
-    bit0_delay = atoi(argv[2]);
-   // trig_intergap_ns = atoi(argv[3])*1000;
-    mode = argv[3];
+int parse_opt(int argc, char *argv[])
+{
+	int opt;
+	int ret = -1;
+	char mode[16];
+
+	while ((opt = getopt(argc, argv, "c:t:m:g:")) != -1) {
+		switch (opt) {
+
+		case 'm':
+		    strcpy(mode,optarg);
+		    break;
+
+		case 'c':
+		    cpu = atoi(optarg);
+		    break;
+
+		case 't':
+		    bit0_delay = atoi(optarg);
+		    break;
+
+		case 'g':
+		     usonic_gpio[usonic_gpio_idx_max++] = atoi(optarg);
+		    break;
+
+		default: /* '?' */
+			help(argc,argv);
+    		}
+	}
 
     if (!strcasecmp(mode,"trig"))
 	usonic_mode = USONIC_TRIG;    
@@ -196,20 +277,55 @@ int main(int argc, char *argv[])
 	usonic_mode = USONIC_ECHO;    
  
     if (usonic_mode != USONIC_TRIG && usonic_mode != USONIC_ECHO){
-	printf("Ilegal mode\n");
-	return -1;
+	printf("Ilegal mode %s\n", mode);
+	help(argc, argv);
     }
 
-    if ( usonic_mode == USONIC_TRIG ) {
-	    if (bit0_delay < 0) {
+    if (usonic_mode == USONIC_TRIG) {
+	int i;
+
+	if (bit0_delay < 0) {
 		printf("must provide a sane bit delay");
-		return 0;
-	    }
+		help(argc, argv);
+	}
 	bit0_delay *= 1000; // to nanosecond
 	bit1_delay = bit0_delay;
-	state = USONIC_TRIG_START;
-    } else{
-	state = USONIC_ECHO_START;
+	usonic_state = USONIC_TRIG_START;
+	for (i = 0 ; i < usonic_gpio_idx_max; i++) {
+		ret = open_gpio(usonic_gpio[i], "out");
+		if (ret) {
+			printf("Failed to program %d gpio\n",usonic_gpio[i]);
+			return -1;
+		}
+	}
+    	printf("Drop cpu %d delay %dus, %d gpios, mode=%s\n",
+		cpu, bit0_delay/1000, usonic_gpio_idx_max ,mode);
+    }
+
+    if (usonic_mode == USONIC_ECHO) {
+	usonic_state = USONIC_ECHO_START;
+	ret = open_gpio(usonic_gpio[0], "in");
+	if (ret) {
+		printf("Failed to program %d gpio\n",usonic_gpio[0]);
+		return -1;
+	}
+    	printf("Drop cpu %d %d gpios, mode=%s\n",
+		cpu, usonic_gpio_idx_max ,mode);
+    }
+   return 0;
+}
+
+/*
+ * it is essential affine the program to the same 
+ * core where it runs.
+*/
+int main(int argc, char *argv[])
+{
+    int i;
+    int rc;
+
+    if (parse_opt(argc, argv) ){
+	
     }
 
     if (hyplet_drop_cpu(cpu) < 0 ){
@@ -217,8 +333,7 @@ int main(int argc, char *argv[])
 	return -1;
     }
 
-    printf("Cpu %d delay %d,%d\n",
-		cpu, bit1_delay, bit0_delay);
+    return 0;
     hyplet_start();
  
     while (1) {
