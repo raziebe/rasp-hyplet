@@ -23,29 +23,20 @@
 */
 DEFINE_PER_CPU(struct hyp_wait ,HYPEVE);
 
-static int gpio_r = 485;
-module_param(gpio_r, int, 0 );
-
-static int gpio_w = 475;
-module_param(gpio_w, int, 0);
-
-static int cpu = 1;
-module_param(cpu, int, 0);
-
-void trig(int val)
+void trig(int gpio, int val)
 {
-	gpio_set_value(gpio_w, val);
+	gpio_set_value(gpio, val);
 }
 
 /*
  * Wait until we don't get this echo value
 */
-long wait_echo(int val)
+long wait_echo(int gpio, int val)
 {
 	int rc;
 
 read_again:
-	rc = gpio_get_value(gpio_r);
+	rc = gpio_get_value(gpio);
 	if (rc == val)
 		goto read_again;
 	return cycles_ns();
@@ -55,24 +46,23 @@ read_again:
     Return value is broken to:
 	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
 	long  cmd_val:8; // trig 1 or 0
-	long  pad:48;
+	lonf  gpio: 8;
+	long  pad:40;
 */
 static void offlet_trigger(struct hyplet_vm *hyp, struct hyp_wait *hypevent)
 {
-	int cmd =      (int) ( hyp->user_arg1  & 0xFF );
-	int cmd_val =  (int) ( (hyp->user_arg1 >> 8) & 0xFF ) ;
+	int cmd =      (int) ( (hyp->user_arg1      )  & 0xFF );
+	int cmd_val =  (int) ( (hyp->user_arg1 >> 8 )  & 0xFF ) ;
+	int gpio    =  (int) ( (hyp->user_arg1 >> 16)  & 0xFF ) ;
 
-//	printk("ARG1 %ld\n", hyp->user_arg1);
 	if (cmd == USONIC_TRIG) {
-//		printk("USONIC TRIG %d\n",cmd_val);
-		trig(cmd_val);
+		trig(gpio, cmd_val);
 		hyp->user_arg1 = cycles_ns();
 		return;
 	}
 
 	if (cmd == USONIC_ECHO) {
-//		printk("USONIC ECHO cmd_val=%d\n",cmd_val);
-		hyp->user_arg1 = wait_echo(cmd_val);
+		hyp->user_arg1 = wait_echo(gpio, cmd_val);
 		return;
 	}
 
@@ -83,8 +73,6 @@ static int offlet_init(void)
 {
 	struct hyp_wait *hypeve;
 	int cpu = 0;
-
-	printk("offlet: gpios: %d %d\n", gpio_w, gpio_r);
 
 	for_each_possible_cpu(cpu) {
 		hypeve = &per_cpu(HYPEVE, cpu);
@@ -100,8 +88,6 @@ static void offlet_cleanup(void)
 	int cpu = 0;
 	struct hyp_wait *hypeve;
 
-//	gpio_free(gpio_w);
-//	gpio_free(gpio_r);
 	for_each_possible_cpu(cpu) {
 		hypeve = &per_cpu(HYPEVE, cpu);
 		offlet_unregister(hypeve, cpu);
