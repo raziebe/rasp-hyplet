@@ -25,13 +25,13 @@
 #define  USONIC_BIT_DONE	8
 #define  USONIC_GPIO_NR		3
 
-static int usonic_gpio_idx_max = 1;
+static int usonic_gpio_idx_max = 0;
 static int usonic_gpio[USONIC_GPIO_NR];
 static int usonic_mode  = USONIC_ECHO;
 static int iter = 1;
 static int bit1_delay = 0;
 static int bit0_delay = 0;
-static int cpu = 1;
+static int cpu = -1;
 static int run = 1;
 static int usonic_state = 0;
 static int bit = 0;
@@ -268,7 +268,12 @@ int parse_opt(int argc, char *argv[])
 		default: /* '?' */
 			help(argc,argv);
     		}
-	}
+    }
+    
+    if (cpu <= 0 ){
+	printf("No cpu %d\n", cpu);
+	return -1;
+    }	
 
     if (!strcasecmp(mode,"trig"))
 	usonic_mode = USONIC_TRIG;    
@@ -303,16 +308,20 @@ int parse_opt(int argc, char *argv[])
     }
 
     if (usonic_mode == USONIC_ECHO) {
+	int i;
+
 	usonic_state = USONIC_ECHO_START;
-	ret = open_gpio(usonic_gpio[0], "in");
-	if (ret) {
-		printf("Failed to program %d gpio\n",usonic_gpio[0]);
-		return -1;
+	for (i = 0 ; i < usonic_gpio_idx_max; i++) {
+		ret = open_gpio(usonic_gpio[0], "in");
+		if (ret) {
+			printf("Failed to program %d gpio\n",usonic_gpio[i]);
+			return -1;
+		}
 	}
     	printf("Drop cpu %d %d gpios, mode=%s\n",
 		cpu, usonic_gpio_idx_max ,mode);
     }
-   return 0;
+   return ret;
 }
 
 /*
@@ -325,7 +334,7 @@ int main(int argc, char *argv[])
     int rc;
 
     if (parse_opt(argc, argv) ){
-	
+	help(argc, argv);
     }
 
     if (hyplet_drop_cpu(cpu) < 0 ){
@@ -333,7 +342,6 @@ int main(int argc, char *argv[])
 	return -1;
     }
 
-    return 0;
     hyplet_start();
  
     while (1) {
