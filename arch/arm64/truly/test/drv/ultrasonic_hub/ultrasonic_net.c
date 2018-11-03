@@ -77,7 +77,7 @@ static int offlet_init(void)
 	for_each_possible_cpu(cpu) {
 		hypeve = &per_cpu(HYPEVE, cpu);
 		hypeve->offlet_action =  offlet_trigger;
-		printk("offlet registered at cpu %d\n", cpu);
+		printk("Offlet registered at cpu %d\n", cpu);
 		offlet_register(hypeve, cpu);
 	}
 	return 0;
