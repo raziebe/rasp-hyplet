@@ -10,8 +10,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-const char *gpio475="/sys/class/gpio/gpio17/value"; // the trigger
-const char *gpio485="/sys/class/gpio/gpio27/value"; // the echo
+const char *gpio_trig="/sys/class/gpio/gpio475/value"; // the trigger
+const char *gpio_echo="/sys/class/gpio/gpio484/value"; // the echo
 
 static inline long cycles_us(void)
 {
@@ -26,7 +26,7 @@ int trig(char *onoff)
 	int b;
 	int fd;
 
-	fd = open(gpio475, O_WRONLY);
+	fd = open(gpio_trig, O_WRONLY);
 	if (fd < 0){
 		perror("Failed to open gpio485 file");
 		return -1;
@@ -49,7 +49,7 @@ long wait_echo(char c)
         int fd;
         char buf[32];
 wait:
-        fd = open(gpio485, O_RDONLY);
+        fd = open(gpio_echo, O_RDONLY);
         if (fd < 0){
                 perror("Failed to open gpio475 file");
                 return ;

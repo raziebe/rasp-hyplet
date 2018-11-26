@@ -26,7 +26,8 @@
 #define  USONIC_GPIO_NR		3
 
 static int usonic_gpio_idx_max = 0;
-static int usonic_gpio[USONIC_GPIO_NR];
+static int usonic_echo_gpio[USONIC_GPIO_NR] = {-1};
+static int usonic_trig_gpio[USONIC_GPIO_NR] = {-1};
 static int usonic_mode  = USONIC_ECHO;
 static int iter = 1;
 static int bit1_delay = 0;
@@ -42,20 +43,22 @@ float supersonic_speed_us = 0.0343;// centimeter/microsecond;
 static int get_trig_gpio(void)
 {
 	static int curr_gpio_idx = 0;
-	curr_gpio_idx = (curr_gpio_idx+1) % usonic_gpio_idx_max;
-	return usonic_gpio[curr_gpio_idx];
+
+	curr_gpio_idx = (curr_gpio_idx + 1) % usonic_gpio_idx_max;
+	return usonic_trig_gpio[curr_gpio_idx];
 }
 
 static int get_echo_gpio(void)
-{
-	return usonic_gpio[0];
+{	
+	// We use a single echo.
+	return usonic_echo_gpio[0];
 }
 
 /*
     Return value is broken to:
 	long  cmd:8;  USONIC_ECHO/USONIC_TRIG
 	long  cmd_val:8; // echo/trig 1 or 0
-	long   gpio:8;
+	long  gpio:8;
 	long  pad:40;	
 */
 long usonic_trig(long time_ns)
@@ -97,7 +100,6 @@ long usonic_echo(long time_ns)
 	long rc;
 	int g = (get_echo_gpio() << 16);
 
-echo_start:
 	if (!run)
 		return 0;
 
@@ -131,8 +133,33 @@ echo_start:
 		hyp_print("#%d us = %ld distance=%f bit=%d\n", 
 			iter++, dt, distance, bit);
 	//	bit = !bit; /* 1010101...*/
-		usonic_state = USONIC_ECHO_START;
-		goto echo_start;
+		usonic_state = USONIC_TRIG_START;
+	}
+
+	/*
+	 * We use HC-RS04 . To be able to wait for an echo, we must trig 
+	 * before echo.  We trig without any delays.
+	*/
+	if (usonic_state == USONIC_TRIG_START){
+		char cmd = USONIC_TRIG;
+		short cmd_val = ((short)1 << 8) ;
+		
+		g =  get_trig_gpio() << 16;
+
+		rc = cmd_val | cmd | g;
+		
+		// Start bit transmit
+		usonic_state = USONIC_TRIG_END; 
+		return rc;
+	}
+
+	if (usonic_state == USONIC_TRIG_END){
+		//  End the transmit
+		usonic_state = USONIC_ECHO_START; 
+
+		g =  get_trig_gpio() << 16;
+		rc = USONIC_TRIG | g;
+		return   rc; // End Bit transmit
 	}
 
 	hyp_print("echo should not be here\n");
@@ -235,7 +262,7 @@ int open_gpio(int _gpio,char *dir)
 
 int help(int argc, char *argv[])
 {
-        printf("%s -c <cpu> -t [bit delay us] -m <mode>(TRIG,ECHO) -g <gpio>\n",
+        printf("%s -c <cpu> -u [bit delay us] -m <mode>(TRIG,ECHO) -t <trig gpio> -e <echo gpio>\n",
 			argv[0]);
 	exit(0);
 }
@@ -246,23 +273,27 @@ int parse_opt(int argc, char *argv[])
 	int ret = -1;
 	char mode[16];
 
-	while ((opt = getopt(argc, argv, "c:t:m:g:")) != -1) {
+	while ((opt = getopt(argc, argv, "m:c:u:t:e:")) != -1) {
 		switch (opt) {
 
 		case 'm':
-		    strcpy(mode,optarg);
+		    strcpy(mode, optarg);
 		    break;
 
 		case 'c':
 		    cpu = atoi(optarg);
 		    break;
 
-		case 't':
+		case 'u':
 		    bit0_delay = atoi(optarg);
 		    break;
 
-		case 'g':
-		     usonic_gpio[usonic_gpio_idx_max++] = atoi(optarg);
+		case 't':
+		     usonic_trig_gpio[usonic_gpio_idx_max++] = atoi(optarg);
+		    break;
+
+		case 'e':
+		     usonic_echo_gpio[0] = atoi(optarg);
 		    break;
 
 		default: /* '?' */
@@ -297,9 +328,10 @@ int parse_opt(int argc, char *argv[])
 	bit1_delay = bit0_delay;
 	usonic_state = USONIC_TRIG_START;
 	for (i = 0 ; i < usonic_gpio_idx_max; i++) {
-		ret = open_gpio(usonic_gpio[i], "out");
+		ret = open_gpio(usonic_trig_gpio[i], "out");
 		if (ret) {
-			printf("Failed to program %d gpio\n",usonic_gpio[i]);
+			printf("Failed to program %d gpio\n",
+				usonic_trig_gpio[i]);
 			return -1;
 		}
 	}
@@ -308,19 +340,28 @@ int parse_opt(int argc, char *argv[])
     }
 
     if (usonic_mode == USONIC_ECHO) {
-	int i;
+		
+		int i;
 
-	usonic_state = USONIC_ECHO_START;
-	for (i = 0 ; i < usonic_gpio_idx_max; i++) {
-		ret = open_gpio(usonic_gpio[0], "in");
+		ret = open_gpio(usonic_echo_gpio[0], "in");
 		if (ret) {
-			printf("Failed to program %d gpio\n",usonic_gpio[i]);
+			printf("Failed to program %d gpio\n",	
+				usonic_echo_gpio[0]);
 			return -1;
 		}
+
+		ret = open_gpio(usonic_trig_gpio[0], "out");
+		if (ret) {
+			printf("Failed to program %d gpio\n",	
+				usonic_trig_gpio[0]);
+			return -1;
+		}
+
+		usonic_state = USONIC_TRIG_START; // HC-SR04 patch. To echo, we need to trig.
+		printf("Drop cpu %d,  echo gpio %d,%d mode=%s\n",
+			cpu, usonic_echo_gpio[0], usonic_trig_gpio[0] ,mode);
 	}
-    	printf("Drop cpu %d %d gpios, mode=%s\n",
-		cpu, usonic_gpio_idx_max ,mode);
-    }
+
    return ret;
 }
 
