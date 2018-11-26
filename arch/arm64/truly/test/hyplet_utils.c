@@ -9,9 +9,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "hyp_spinlock.h"
 
-#include <linux/hyplet_user.h>
+#include "hyp_spinlock.h"
+#include "hyplet_user.h"
 #include "hyplet_utils.h"
 
 static struct hyp_state hypstate;
@@ -49,6 +49,19 @@ int hyplet_set_callback(void *addr,int cpu)
 	hplt.__action.addr.addr = (unsigned long)addr;
 	hplt.__resource.cpu = cpu;
 	rc = hyplet_ctl(HYPLET_SET_CALLBACK, &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed to map code\n");
+		return -1;
+	}
+	return 0;
+}
+
+int hyplet_run(void)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	rc = hyplet_ctl(HYPLET_EXECUTE, &hplt);
 	if (rc < 0){
 		printf("hyplet: Failed to map code\n");
 		return -1;
@@ -114,6 +127,7 @@ int hyplet_drop_cpu(int cpu)
 	return -1;
 }
 
+
 int hyplet_assign_offlet(int cpu,void* addr)
 {
 	int rc;
@@ -177,6 +191,53 @@ int hyplet_map_all(int cpu)
 	hyplet_init_print();
 	hplt.__resource.cpu = cpu;
 	return hyplet_ctl(HYPLET_MAP_ALL, &hplt);
+}
+
+int hyplet_set_print(void *addr,int cpu)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	hplt.__resource.cpu = cpu;
+	hplt.__action.addr.addr = (unsigned long)addr;
+	rc = hyplet_ctl(HYPLET_REGISTER_PRINT , &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed map print func\n");
+		return -1;
+	}
+	return 0;
+}
+
+int hyplet_map_vma(void *addr,int cpu)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	hplt.__resource.cpu = cpu;
+	hplt.__action.addr.addr = (unsigned long)addr;
+	hplt.__action.addr.size = 1;
+	rc = hyplet_ctl(HYPLET_MAP_VMA , &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed map print func\n");
+		return -1;
+	}
+	return 0;
+}
+
+int hyplet_map(void *addr,int size,int cpu)
+{
+	int rc;
+	struct hyplet_ctrl hplt;
+
+	hplt.__resource.cpu = cpu;
+	hplt.__action.addr.addr = (unsigned long)addr;
+	hplt.__action.addr.size = size;
+	rc = hyplet_ctl(HYPLET_MAP , &hplt);
+	if (rc < 0){
+		printf("hyplet: Failed map print func\n");
+		return -1;
+	}
+	return 0;
 }
 
 /*
@@ -255,10 +316,10 @@ char* hyp_strcpy(char *dst, const char *src)
 int hyp_print(const char *fmt, ...)
 {
      va_list ap;
-     int i = 0, f = 0;
-     struct hyp_fmt tmp_fmt;
+     int i = 0,f = 0;
+     int idx = hypstate.fmt_idx;
 
-     hyp_memcpy(&tmp_fmt.fmt[0], fmt, hyp_strlen(fmt) );
+     hyp_memcpy(&hypstate.fmt[idx].fmt[0], fmt, hyp_strlen(fmt) );
 
      va_start(ap, fmt);
      while (*fmt) {
@@ -272,32 +333,29 @@ int hyp_print(const char *fmt, ...)
 
          switch (*fmt++) {
            case 's':  /* string */
-                   tmp_fmt.i[i++] = (long)va_arg(ap, char *);
+                   hypstate.fmt[idx].i[i++] = (long)va_arg(ap, char *);
                    break;
 
 	   case 'f': /* float */
-                   tmp_fmt.f[f++] = (double)va_arg(ap, double);
+                   hypstate.fmt[idx].f[f++] = (double)va_arg(ap, double);
                    break;
 
 	   case 'l':  /* long */
-                   tmp_fmt.i[i++] = va_arg(ap, long );
+                   hypstate.fmt[idx].i[i++] = va_arg(ap, long );
                    break;
 
            case 'd':  /* int */
-                   tmp_fmt.i[i++] = va_arg(ap, int );
+                   hypstate.fmt[idx].i[i++] = va_arg(ap, int );
                    break;
 
            case 'c':  /* char */
-                   tmp_fmt.i[i++] = (char) va_arg(ap, int);
+                   hypstate.fmt[idx].i[i++] = (char) va_arg(ap, int);
                    break;
            }
            va_end(ap);
      }
 
      spin_lock(&hypstate.sync);
-     hypstate.fmt[hypstate.fmt_idx] = tmp_fmt;
-     hypstate.fmt[hypstate.fmt_idx].active = 1;
-     __sync_synchronize();
      hypstate.fmt_idx =  (hypstate.fmt_idx + 1) % PRINT_LINES;
      spin_unlock(&hypstate.sync);
 }
@@ -308,20 +366,13 @@ static void __print_hyp(int idx) {
 	struct hyp_fmt fmt;
 
 	spin_lock(&hypstate.sync);
-	fmt = hypstate.fmt[idx];
-     	hypstate.fmt[idx].active = 0;
-    	 __sync_synchronize();
+	memcpy(&fmt,&hypstate.fmt[idx],sizeof(fmt));
 	spin_unlock(&hypstate.sync);
 
-	hyp_print2(&fmt);
+	hyp_print2(&hypstate.fmt[idx]);
 }
 
 void print_hyp(void) 
 {
-        int i = 0;
-
-	for (; i < PRINT_LINES; i++) {
-     		if (hypstate.fmt[i].active)
-			 __print_hyp(i);
-	}
+	__print_hyp(hypstate.fmt_idx);
 }

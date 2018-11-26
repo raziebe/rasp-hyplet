@@ -85,7 +85,7 @@ static void clear_pmd_entry(pmd_t *pmd, phys_addr_t addr)
 }
 
 
-static void unmap_ptes(pmd_t *pmd,
+void unmap_ptes(pmd_t *pmd,
 		       phys_addr_t addr, phys_addr_t end)
 {
 	phys_addr_t start_addr = addr;
@@ -93,13 +93,16 @@ static void unmap_ptes(pmd_t *pmd,
 
 	start_pte = pte = pte_offset_kernel(pmd, addr);
 	do {
+
 		if (!pte_none(*pte)) {
+
 			pte_t old_pte = *pte;
 
 			tp_set_pte(pte, __pte(0));
 			/* No need to invalidate the cache for device mappings */
 			if (pfn_valid(pte_pfn(old_pte)))
 				tp_flush_dcache_pte(old_pte);
+;
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -117,14 +120,20 @@ static void unmap_pmds(pud_t *pud,
 	start_pmd = pmd = pmd_offset(pud, addr);
 	do {
 		next = tp_pmd_addr_end(addr, end);
+
 		if (!pmd_none(*pmd)) {
+
 			if (tp_pmd_huge(*pmd)) {
+
 				pmd_t old_pmd = *pmd;
 				pmd_clear(pmd);
 				tp_flush_dcache_pmd(old_pmd);
 				put_page(virt_to_page(pmd));
+
 			} else {
+
 				pmd_t old_pmd = *pmd;
+
 				tp_flush_dcache_pmd(old_pmd);
 				unmap_ptes(pmd, addr, next);
 			}
@@ -152,6 +161,7 @@ static void unmap_puds( pgd_t *pgd,
 				tp_flush_dcache_pud(old_pud);
 				put_page(virt_to_page(pud));
 			} else {
+
 				unmap_pmds( pud, addr, next);
 			}
 		}

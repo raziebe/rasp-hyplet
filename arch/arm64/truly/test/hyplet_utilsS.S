@@ -56,3 +56,15 @@ hyp_print2:
    pop x0, x1
 
    ret
+
+.balign 512
+.global test_opcode
+test_opcode:
+    mrs x9,tpidr_el2
+    str x30,[x9,#0]
+    mov x30,xzr
+    mov x9, xzr
+   .inst 0xffffffff
+    mrs x9,tpidr_el2
+    ldr x30,[x9,#0]
+   ret

@@ -100,8 +100,8 @@ int __hyplet_map_user_data(long umem,int size,int flags,struct hyplet_vm *hyp)
 
 	pages = create_hyp_user_mappings((void *)umem, (void *)(umem + size), PAGE_HYP_RW_EXEC);
 	if (pages <= 0){
-			hyplet_err(" failed to map to ttbr0_el2\n");
-			return -1;
+		hyplet_debug(" failed to map to ttbr0_el2 size %d\n",size);
+		return -1;
 	}
 
 	addr = kmalloc(sizeof(struct hyp_addr ), GFP_USER);
@@ -120,14 +120,58 @@ int __hyplet_map_user_data(long umem,int size,int flags,struct hyplet_vm *hyp)
 	return 0;
 }
 
+int hyplet_map_user(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl)
+{
+	struct vm_area_struct* vma;
+	long start = hypctl->__action.addr.addr;
+	int size  = hypctl->__action.addr.size;
+	long end = start + size;
+
+	vma = current->mm->mmap;
+
+	for (; vma ; vma = vma->vm_next) {
+		long vm_start = vma->vm_start;
+		long vm_end  = vma->vm_end;
+
+		if (vm_start <= start && vm_end >= end){
+				return  __hyplet_map_user_data(start,
+						size, vma->vm_flags, hyp);
+		}
+	}
+
+	return -EINVAL;
+}
+
+int hyplet_map_user_vma(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl)
+{
+	struct vm_area_struct* vma;
+	long start = hypctl->__action.addr.addr;
+	int size  = hypctl->__action.addr.size;
+	long end = start + size;
+
+	vma = current->mm->mmap;
+
+	for (; vma ; vma = vma->vm_next) {
+		long vm_start = vma->vm_start;
+		long vm_end  = vma->vm_end;
+
+		size = vm_end - vm_start;
+		if (vm_start <= start && vm_end >= end){
+				return  __hyplet_map_user_data(start,
+						size, vma->vm_flags, hyp);
+		}
+	}
+
+	return -EINVAL;
+}
 /*
  *  scan the process's vmas and map all possible pages
  */
-int hyplet_map_user(struct hyplet_vm *hyp)
+int hyplet_map_all(struct hyplet_vm *hyp)
 {
 	struct vm_area_struct* vma;
 
-	vma = current->active_mm->mmap;
+	vma = current->mm->mmap;
 
 	for (; vma ; vma = vma->vm_next) {
 		long start = vma->vm_start;
@@ -143,26 +187,46 @@ int hyplet_check_mapped(struct hyplet_vm *hyp,void *action)
 	struct hyplet_map_addr *uaddr = (struct hyplet_map_addr *)action;
 
 	if (hyplet_get_addr_segment(uaddr->addr ,hyp)) {
-		hyplet_err(" address %lx already mapped\n",uaddr->addr);
+		hyplet_debug(" address %lx already mapped\n",uaddr->addr);
 		return 1;
 	}
 	return 0;
 }
 
+
+void hyplet_flush_caches(struct hyplet_vm *tv)
+{
+        struct hyp_addr* tmp;
+        unsigned long flags = 0;
+
+        spin_lock_irqsave(&tv->lst_lock, flags);
+
+        list_for_each_entry(tmp, &tv->hyp_addr_lst, lst) {
+        	hyplet_call_hyp(hyplet_invld_tlb,  tmp->addr);
+        	if (tmp->flags & VM_EXEC) {
+        		hyplet_call_hyp(hyplet_flush_el2_icache,  tmp->addr);
+        		continue;
+        	}
+        	hyplet_call_hyp(hyplet_flush_el2_dcache,  tmp->addr);
+        }
+        hyplet_call_hyp(hyplet_invld_all_tlb);
+        spin_unlock_irqrestore(&tv->lst_lock, flags);
+}
+
 void hyplet_free_mem(struct hyplet_vm *tv)
 {
         struct hyp_addr* tmp,*tmp2;
+        unsigned long flags = 0;
+
+        spin_lock_irqsave(&tv->lst_lock, flags);
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
-/*
-        	hyplet_info("unmap %lx/%lx size=%d "
+        	hyplet_info("unmap %lx size=%d "
         			"pages=%d flags=%x\n",
         		tmp->addr,
-				tmp->addr & PAGE_MASK,
 				tmp->size,
 				tmp->nr_pages, tmp->flags);
-*/
 
         	hyp_user_unmap( tmp->addr , PAGE_SIZE,  1 );
         	hyplet_call_hyp(hyplet_invld_tlb,  tmp->addr);
@@ -170,12 +234,13 @@ void hyplet_free_mem(struct hyplet_vm *tv)
          	if (tmp->flags & VM_EXEC)
         			flush_icache_range(tmp->addr, tmp->addr + tmp->size);
 
-         	if (tmp->flags & (VM_READ | VM_WRITE)){
+         	if (tmp->flags & (VM_READ | VM_WRITE))
     			__flush_cache_user_range(tmp->addr, tmp->addr + tmp->size);
-		}
-         	list_del(&tmp->lst);
+
+		  	list_del(&tmp->lst);
         	kfree(tmp);
-        }
-        hyplet_call_hyp(hyplet_invld_all_tlb);
+         }
+    //    hyplet_call_hyp(hyplet_invld_all_tlb);
+        spin_unlock_irqrestore(&tv->lst_lock, flags);
 }
 

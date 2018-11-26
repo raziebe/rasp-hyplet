@@ -31,11 +31,6 @@ static const int arm_arch_timer_reread = 1;
 	_val; \
 })
 
-static inline void cpu_relax(void)
-{
-	asm volatile("yield" ::: "memory");
-}
-
 static inline long __cycles(void) {
 	long cval;
 	cval = ARCH_TIMER_READ("cntvct_el0"); 		
@@ -50,10 +45,6 @@ static inline u64 hyp_gettime() {
 	return t * CLOCK_DIVISOR;
 }
 
-static inline u64 hyp_gettime_us() {
-	return hyp_gettime()/1000;
-}
-
 static inline long cntvoff_el2(void)
 {
 	long val;
@@ -66,15 +57,12 @@ static inline void set_cntvoff_el2(long val)
 	asm ("msr  cntvoff_el2, %0" : "=r" (val) );
 }
 
-#define PRINT_LINES	100
-/*
- * Never change the order of these lines 
-*/
+#define PRINT_LINES	10
+
 struct hyp_fmt {
 	char fmt[128];
 	long i[7];
 	double f[7];
-	int active;
 };
 
 
@@ -97,7 +85,10 @@ int hyp_print(const char *format, ...);
 int hyp_print2(struct hyp_fmt *format);
 void print_hyp(void);
 int hyp_wait(int cpu,int ms);
-
+int hyplet_set_print(void *addr, int cpu);
+int hyplet_map_vma(void *addr,int cpu);
+int get_section_addr(char *secname,long *addr, int *size);
+int Elf_parser_load_memory_map(char *prog);
 
 #endif
 

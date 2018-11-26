@@ -16,13 +16,10 @@ int iters  = 0;
 unsigned long next = 0;
 
 /*
-	Put whatever you want here
+ * 	
 */
-long user_print(long a1,long a2,long a3,long a4)
+long test_opcode(long a1,long a2,long a3,long a4)
 {
-	hyp_print("iters %d a=%ld,%ld,%ld,%ld\n",
-		iters, a1, a2, a3, a4);
-	iters++;
 	return 0;
 }
 
@@ -82,10 +79,9 @@ int main(int argc, char *argv[])
     }
 
     hyplet_start();
-    printf("Waiting for offlet %d for 100 useconds\n",cpu);
+    printf("Waiting for opcode detector %d for 100 useconds\n",cpu);
 
-    
-    for (;i < 100; i++) {
+    for (i = 0; i < 100; i++) {
 	print_hyp();
     	hyp_wait(cpu, 100);
     }

@@ -9,6 +9,38 @@
 .pushsection	.hyp.text, "ax" // borrow  hyp.text
 .align	PAGE_SHIFT
 
+.macro zero_all
+	mov x0, xzr
+	mov x1,xzr
+	mov x2,xzr
+	mov x3,xzr
+	mov x4,xzr
+	mov x5,xzr
+	mov x6,xzr
+	mov x7,xzr
+	mov x8,xzr
+	mov x9,xzr
+	mov x10,xzr
+	mov x11,xzr
+	mov x12,xzr
+	mov x13,xzr
+	mov x14,xzr
+	mov x15,xzr
+	mov x16,xzr
+	mov x17,xzr
+	mov x18,xzr
+	mov x19,xzr
+	mov x20,xzr
+	mov x21,xzr
+	mov x22,xzr
+	mov x23,xzr
+	mov x24,xzr
+	mov x25,xzr
+	mov x26,xzr
+	mov x27,xzr
+	mov x28,xzr
+	mov x29,xzr
+.endm
 
 .macro invalid_vector   label,num
 .align 7
@@ -142,15 +174,22 @@ __hyp_panic_str:
 	.ascii	"hyplet panic:\nCode:%08x PC:%016x ESR:%08x\nFAR:%016x" \
 	" HPFAR:%016x RAZDBG:%p\nTrulyCxt:%p\n\0"
 
-ENTRY(hyplet_get_tcr_el1)
-	mrs     x0, tcr_el1
+ENTRY(hyplet_flush_el2_dcache)
+	dc      civac, x0     // clean & invalidate D line / unified line
+   	dsb     ish
 	ret
-ENDPROC(hyplet_get_tcr_el1)
+ENDPROC(hyplet_flush_el2_dcache)
+
+ENTRY(hyplet_flush_el2_icache)
+    ic      ivau, x0
+   	dsb     ish
+	ret
+ENDPROC(hyplet_flush_el2_icache)
 
 ENTRY(hyplet_invld_tlb)
 	tlbi vae2, x0
 	dsb sy
-    	tlbi vale2, x0
+    tlbi vale2, x0
 	dsb sy
 	ret
 ENDPROC(hyplet_invld_tlb)
@@ -299,83 +338,213 @@ ENDPROC(hyplet_trap_off)
  *	Executing ISR hyplet
 */
 ENTRY(hyplet_run_user)
-
 /*
  * User had set an hyplet
  *  prepare to jump to hyplet
 */
 	push_registers
 /* sp_el0 is the kernel's current */
-	mrs  x0,sp_el0
-	push x0, xzr
 	mrs	 x9, tpidr_el2
 
-	mrs		x1, elr_el2
-	str		x1, [x9, HYPLET_ELR_EL2]
+/* sp_el0 holds current, save it */
+	mrs  x0, sp_el0
+	str	 x0,[x9,#HYPLET_SP_EL0]
 
-	ldr		x1, [x9, HYPLET_STACK]
-	msr		sp_el0,x1
-	ldr		x30,[x9, HYPLET_CODE]
-	ldr		x0,[x9,#HYPLET_ARG1]
-	ldr		x1,[x9,#HYPLET_ARG2]
-	ldr		x2,[x9,#HYPLET_ARG3]
-	ldr		x3,[x9,#HYPLET_ARG4]
+	mrs     x1, elr_el2
+    str     x1, [x9, #HYPLET_ELR_EL2]
 
-/*  EL2t. Switch stacks  spsel.sp = 0 --> sp = sp_el0 */
-	mrs 	 x9, spsel
-	and 	 w9,w9,#0xFFFFFFFE
-	msr  	 spsel,x9
+/* store the stack (sp_el2) incase where it gets corrupted */
+	mov  x1, sp
+	str	 x1,[x9, #HYPLET_SP_EL2]
 
-	blr 	x30 // Execute hyplet in EL2
-/* save return value */
+    mrs x1, spsel
+   	str x1, [x9, #HYPLET_SPSEL_EL2]
+    mrs x1,spsr_el2
+	str	x1, [x9, #HYPLET_SPSR_EL2]
+
+
+	mov x1, #2
 	mrs	 x9, tpidr_el2
-	str	 x0,[x9,#HYPLET_ARG1]
+	ldr	x2, [x9, #HYPLET_PRINT]
+	blr x2
+	mov x1, x0 /* stash the next instruction  in x1 */
 /*
- * switch stacks back
+ 	generate the program
 */
-	mrs 	x1, spsel
-	orr 	w1, w1, #0x1
-	msr 	spsel,x1
+	mov		x3, #0xd049
+	movk	x3, #0xd53c, lsl #16
+	lsl		x3, x3, #32
 
-	msr 	cntvoff_el2,xzr
-	pop x0,	xzr
-	msr sp_el0,x0
-	pop_registers
+	mrs	 	x9, tpidr_el2
+	ldr		x2, [x9, #HYPLET_OPCODE]
+	and 	x1, x1, #0xFFFFFFFF
+	orr		x0, x3, x1
+/*   put it back in the code */
+	ldr	x30,[x9, #HYPLET_OPCODE]
 
-	ret
+/*	flush cache */
+	ic      ivau, x30
+    dsb     ish
+/* store the instruction */
+	str	x0,	[x30, #0]
+	ldr	x30,[x9, #HYPLET_CODE]
+exec_hyp:
+	zero_all
+	/* zero stack */
+	mov sp, x0
+	blr 	x30 /* Execute hyplet in EL2, if LR is manipulated by the opcode, then we drop to abort */
+/*	the hyplet did not fault */
+	mrs	 x9, tpidr_el2
+/* restore stack, for cases where the opcode manipulates the sp */
+	ldr x1,[x9,#HYPLET_SP_EL2]
+	mov	sp, x1
+
+/*	load the instruction address */
+	ldr	x3, [x9, #HYPLET_OPCODE]
+
+/*	flush cache */
+	ic      ivau, x3
+    dsb     ish
+
+/*	record non faulted opcode */
+	ldr	x0, [x3, #0]
+	mov x1, #1
+	ldr	x2, [x9, #HYPLET_PRINT]
+	blr x2
+/*	if return 1 then shoud stop */
+	cbnz x0,3f
+/*
+ 	generate the next program
+    generate the "mrs r9,tpidr_el2" opcode */
+	mov		x3, #0xd049
+	movk	x3, #0xd53c, lsl #16
+	lsl		x3,x3, #32
+
+/*	move to next opcode to test */
+	ldr		x2, [x9, #HYPLET_OPCODE]
+	ldr		x1, [x2, #0]
+	and 	x1, x1, #0xFFFFFFFF
+	sub		x1, x1, #1
+	orr		x0, x3, x1
+
+/*   put it back in the code */
+	ldr		x30,[x9, #HYPLET_OPCODE]
+	str		x0,	[x30, #0]
+	ldr		x30,[x9, #HYPLET_CODE]
+/*	go back and execute the new program */
+	b exec_hyp
+
+3:
+    mrs 	x9 , tpidr_el2
+    ldr		x0, [x9, #HYPLET_ELR_EL2]
+    msr		elr_el2, x0
+	str	 	xzr, [x9, #HYPLET_CODE]
+
+	ldr		x1, [x9, #HYPLET_SPSR_EL2]
+    msr	 	spsr_el2,x1
+
+   	ldr 	x1, [x9, #HYPLET_SPSEL_EL2]
+    msr		spsel,x1
+
+
+	/* restore the stack (sp_el2) as we entered */
+	ldr	 x1,[x9, #HYPLET_SP_EL2]
+	mov  sp,x1
+
+    pop_registers
+    pop	lr, xzr
+	eret
 
 ENDPROC(hyplet_run_user)
 
 hyplet_abort_isr:
-//
-// reset stack back
-	mrs 	x1, spsel
-	orr 	w1, w1, #0x1
-	msr 	spsel,x1
-	msr 	cntvoff_el2, xzr
+	mrs x9 , tpidr_el2
 
-// force El1h
-	mrs		x1, spsr_el2
-	and		w1, w1, 0xFFFFFFF0
-	mov		x2, 0x5
-	orr		x1, x1, x2
-	msr		spsr_el2,x1
+/* restore stack, just in case */
+	ldr x1,[x9,#HYPLET_SP_EL2]
+	mov	sp, x1
 
-	mrs		x0, tpidr_el2
-	mrs		x1,elr_el2
-	str		x1, [x0, HYPLET_FAULTY_ELR_EL2]
-	mrs		x1,esr_el2
-	str		x1,[x0, HYPLET_FAULTY_ESR_EL2]
-// restore position
-	ldr 	x1,[x0, HYPLET_ELR_EL2]
-	msr		elr_el2,x1
+/* x4 holds the instruction address */
+	ldr	x4, [x9, #HYPLET_OPCODE]
 
-	pop_registers
+/*	load the instruction opcode in x3 */
+	ldr	x3, [x4, #0]
+	mov x8, x3	/* stash for later use */
+/*	flush the cache line */
+	ic      ivau, x4
+    dsb     ish
 
-	pop	lr, xzr
+/*	generate the next program d53cd049  */
+	mov		x2, x3
+	mov		x3, #0xd049
+	movk	x3, #0xd53c, lsl #16
+	lsl		x3, x3, #32
 
-	eret
+/*	move to next opcode to test */
+	and 	x2, x2, #0xFFFFFFFF
+	sub		x2, x2, #1
+	orr		x0, x3, x2
+
+/* store the new command */
+	str	 x0,	[x4, #0]
+	ldr	x30,[x9, #HYPLET_CODE]
+
+/* record the command */
+	ldr	 x2, [x9, #HYPLET_PRINT]
+	mov  x0, x8	 /* */
+	mov  x1, xzr /* we had an mmu abort */
+	push x3, x4
+	blr  x2
+	pop x3, x4
+
+	ldr x30,[x9, #HYPLET_CODE]
+	zero_all
+/* zero the stack */
+	mov sp, x0
+/* perform the opcode  */
+	blr	x30
+/*	We're back, this command did not abort, record it. */
+	mrs x9 , tpidr_el2
+/* restore the stack */
+	ldr x1,[x9,#HYPLET_SP_EL2]
+	mov	sp,x1
+
+	ldr	x4, [x9, #HYPLET_OPCODE]
+	ldr	x0, [x4, #0]
+	mov x1, #1 /* type 1 opcode */
+	ldr	x2, [x9, #HYPLET_PRINT]
+	blr x2
+
+/*	if return 1 then shoud stop */
+	cbnz x0,1f
+	b hyplet_abort_isr
+
+1: /* return to the kernel */
+    mrs 	x0 , tpidr_el2
+    ldr		x0, [x0, #HYPLET_ELR_EL2]
+    msr		elr_el2, x0
+
+	ldr		x1, [x9, #HYPLET_SPSR_EL2]
+    msr 	spsr_el2,x1
+
+   	ldr 	x1, [x9, #HYPLET_SPSEL_EL2]
+    msr 	spsel,x1
+
+	mrs		x9, tpidr_el2
+	str		x0, [x9,#HYPLET_ARG1]
+
+/* force exit from offline mode */
+	str xzr, [x9, #HYPLET_CODE]
+ /* restore state */
+  //  pop x0,xzr
+    pop_registers
+    pop	lr, xzr
+
+   eret
+
 ENDPROC(hyplet_abort_isr)
+__unknown_log:
+	.ascii	"%lx\n\0"
 
 ENTRY(hyplet_on)
 
