@@ -146,19 +146,23 @@ int hyplet_map_user_vma(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl)
 {
 	struct vm_area_struct* vma;
 	long start = hypctl->__action.addr.addr;
-	int size  = hypctl->__action.addr.size;
-	long end = start + size;
+	int rsize  = hypctl->__action.addr.size;
+	long end = start + rsize;
 
 	vma = current->mm->mmap;
 
 	for (; vma ; vma = vma->vm_next) {
+		int size;
 		long vm_start = vma->vm_start;
 		long vm_end  = vma->vm_end;
 
 		size = vm_end - vm_start;
+	//	printk("user vma %lx/%lx %lx/%lx %d/%d\n",
+	//		start,vm_start, end, vm_end , size,rsize );
+
 		if (vm_start <= start && vm_end >= end){
-				return  __hyplet_map_user_data(start,
-						size, vma->vm_flags, hyp);
+			return  __hyplet_map_user_data(start,
+				size, vma->vm_flags, hyp);
 		}
 	}
 
@@ -222,7 +226,7 @@ void hyplet_free_mem(struct hyplet_vm *tv)
 
         list_for_each_entry_safe(tmp, tmp2, &tv->hyp_addr_lst, lst) {
 
-        	hyplet_info("unmap %lx size=%d "
+        	hyplet_debug("unmap %lx size=%d "
         			"pages=%d flags=%x\n",
         		tmp->addr,
 				tmp->size,

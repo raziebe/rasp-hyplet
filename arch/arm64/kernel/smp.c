@@ -291,16 +291,16 @@ static int op_cpu_disable(unsigned int cpu)
 	 * If we don't have a cpu_die method, abort before we reach the point
 	 * of no return. CPU0 may not have an cpu_ops, so test for it.
 	 */
-	printk("%s %d\n",__func__,__LINE__);
 	if (!cpu_ops[cpu] ) {
-		printk("no cpu ops\n");
 		return -EOPNOTSUPP;
 	}
-
-//	if (!cpu_ops[cpu]->cpu_die) {
-//		printk("no cpu ops die action\n");
-//		return -EOPNOTSUPP;
-//	}
+/* We allow the processoro to continue the offline process,
+   even though psci is available 
+	if (!cpu_ops[cpu]->cpu_die) {
+		printk("no cpu ops die action\n");
+		return -EOPNOTSUPP;
+	}
+*/
 	/*
 	 * We may need to abort a hot unplug for some other mechanism-specific
 	 * reason.
@@ -319,11 +319,9 @@ int __cpu_disable(void)
 	unsigned int cpu = smp_processor_id();
 	int ret;
 
-	printk("%s %d\n",__func__,__LINE__);
 	ret = op_cpu_disable(cpu);
 	if (ret)
 		return ret;
-	printk("%s %d\n",__func__,__LINE__);
 
 	/*
 	 * Take this CPU offline.  Once we clear this, we can't return,
