@@ -160,6 +160,7 @@ int main(void)
   DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
   DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
   DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  user_hyplet_code ));
+  DEFINE(HYPLET_OPCODE , offsetof(struct hyplet_vm,  opcode ));
 
   DEFINE(HYPLET_ELR_EL2, offsetof(struct hyplet_vm, elr_el2));
   DEFINE(HYPLET_SP_EL0, offsetof(struct hyplet_vm, sp_el0));
@@ -169,5 +170,10 @@ int main(void)
   DEFINE(HYPLET_ARG4, offsetof(struct hyplet_vm, user_arg4));
   DEFINE(HYPLET_FAULTY_ELR_EL2,offsetof(struct hyplet_vm, faulty_elr_el2));
   DEFINE(HYPLET_FAULTY_ESR_EL2,offsetof(struct hyplet_vm, faulty_esr_el2));
+  DEFINE(HYPLET_PRINT ,offsetof(struct hyplet_vm, el2_log));
+  DEFINE(HYPLET_SP_EL2 ,offsetof(struct hyplet_vm, sp_el2));
+  DEFINE(HYPLET_SPSEL_EL2 ,offsetof(struct hyplet_vm, spsel));
+  DEFINE(HYPLET_SPSR_EL2 ,offsetof(struct hyplet_vm, spsr_el2));
+
   return 0;
 }

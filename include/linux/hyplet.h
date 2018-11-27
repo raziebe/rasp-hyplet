@@ -97,17 +97,22 @@ struct hyp_addr {
 
 
 struct hyplet_vm {
+	unsigned long lr; /* we use LR in the test_code, leave it in offset 0 */
 	unsigned int irq_to_trap __attribute__ ((packed));
 	int	hyplet_id __attribute__ ((packed));//  the hyplet of this core
+	unsigned long user_hyplet_code;	// this core hyplet codes
+	unsigned long opcode;
+	unsigned long hyplet_stack;	// this core hyplet stack
 	unsigned long sp_el0;
+	unsigned long sp_el2;
 	unsigned long user_arg1;
 	unsigned long user_arg2;
 	unsigned long user_arg3;
 	unsigned long user_arg4;
 	unsigned long elr_el2;
-
-	unsigned long hyplet_stack;	// this core hyplet stack
-	unsigned long user_hyplet_code;	// this core hyplet codes
+	unsigned long el2_log;
+	unsigned long spsr_el2;
+	unsigned long spsel;
 
 	struct task_struct *tsk;
  	struct list_head callbacks_lst;
@@ -159,14 +164,14 @@ int 		hyplet_imp_timer(struct hyplet_vm *);
 void 		hyplet_trap_on(void);
 void 		hyplet_trap_off(void);
 int 		hyplet_check_mapped(struct hyplet_vm *,void *action);
-int		hyplet_map_user(struct hyplet_vm *);
+int			hyplet_map_all(struct hyplet_vm *);
 void 		hyplet_offlet(unsigned int cpu);
 void		hyplet_invld_all_tlb(void);
-
-void		 offlet_register(struct hyp_wait* hypevent,int cpu);
-void		 offlet_unregister(struct hyp_wait* hypevent,int cpu);
-
+void		hyplet_flush_el2_dcache(long va);
+void		hyplet_flush_el2_icache(long va);
+void 		hyplet_flush_caches(struct hyplet_vm *tv);
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
+
 
 
 #define hyplet_info(fmt, ...) \

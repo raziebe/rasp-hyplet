@@ -12,6 +12,10 @@ typedef enum {
 	   HYPLET_IMP_TIMER = 8,
 	   OFFLET_SET_CALLBACK = 9,
 	   HYPLET_WAIT = 10,
+	   HYPLET_EXECUTE = 11, // would execute the mapped hyplet 
+	   HYPLET_REGISTER_PRINT = 12,
+	   HYPLET_MAP = 13,
+	   HYPLET_MAP_VMA = 14,
 }hyplet_ops;
 
 
@@ -42,6 +46,7 @@ struct hyplet_ctrl {
 		int irq;
 		int cpu;
 		int timeout_ms;
+		int opcode; // return value used in unknown opcode
 	}__resource  __attribute__ ((packed));
 };
 
