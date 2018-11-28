@@ -1,0 +1,12 @@
+
+ According to section C5.1.2 
+  the 21-th bit ,aka as the L bit = 0x200000
+ is an undefined opcode when in conjunction with op0 = 0b0x
+ This means, that opcodes bellow that 0xD52fffff to D520000, 
+  may some special opcodes that exits only within certain ARMv8 implementations
+ and may be used to differentiate between the different models
+
+So I reached this opcode in the emulation, and then it stucked.
+ 0:	d51cd060 	msr	s3_4_c13_c0_3, x0
+
+The next command 0xd51cd05f must be skipped as it clears tpidr_el2 itself.

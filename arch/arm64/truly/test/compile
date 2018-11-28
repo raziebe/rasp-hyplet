@@ -1,20 +1,22 @@
 #!/bin/sh
 #
 # This script compiles and links and the binary
-# We do some elf parsing here because we need to know the 
-# hyplet size in advance.
-#sudo kpartx -a /opt/truly/linaro_fvp/armv8.img
+
+sudo kpartx -a /opt/truly/linaro_fvp/armv8.img
 #
-GCC=gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu
-CC=/opt/${GCC}/bin/aarch64-linux-gnu-gcc 
+GCC=/opt/gcc-linaro-4.9-2015.05-x86_64_aarch64-linux-gnu/
+CC=${GCC}/bin/aarch64-linux-gnu-gcc 
 READELF=/opt/${GCC}/bin/aarch64-linux-gnu-readelf
 OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
-STRIP=/opt/${GCC}/bin/aarch64-linux-gnu-strip
+#
+$CC unknown_opcode.c \
+	hyplet_utils.c \
+	hyplet_utilsS.S \
+	elf.c \
+	-o unknowncode
 
-# simple isr hyplet
-$CC --static  -I ../../../../include offlet_timer.c hyplet_utilsS.S hyplet_utils.c -o timer
-$CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utilsS.S  -o offprint
-$CC --static   -I ../../../../include iar_recv2.c hyplet_utils.c  hyplet_utilsS.S  -o iar_rcv_offlet2 
-
-$CC --static   -I ../../../../include ultrasonic_hyplet.c hyplet_utils.c  hyplet_utilsS.S  -o  ultrasonic_hyplet
-$STRIP ultrasonic_hyplet
+mkdir -p /tmp/fvp/
+sudo mount /dev/mapper/loop0p2 /tmp/fvp
+sudo cp  unknowncode /tmp/fvp//home/root/
+sudo umount /tmp/fvp
+sudo kpartx -d /opt/truly/linaro_fvp/armv8.img

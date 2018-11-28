@@ -218,7 +218,6 @@ int hyplet_map_vma(void *addr,int cpu)
 	hplt.__action.addr.size = 1;
 	rc = hyplet_ctl(HYPLET_MAP_VMA , &hplt);
 	if (rc < 0){
-		printf("hyplet: Failed map print func\n");
 		return -1;
 	}
 	return 0;
@@ -234,7 +233,6 @@ int hyplet_map(void *addr,int size,int cpu)
 	hplt.__action.addr.size = size;
 	rc = hyplet_ctl(HYPLET_MAP , &hplt);
 	if (rc < 0){
-		printf("hyplet: Failed map print func\n");
 		return -1;
 	}
 	return 0;
