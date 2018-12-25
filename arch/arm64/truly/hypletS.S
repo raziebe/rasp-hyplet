@@ -368,6 +368,14 @@ ENTRY(hyplet_run_user)
 	ldr	x2, [x9, #HYPLET_PRINT]
 	blr x2
 	mov x1, x0 /* stash the next instruction  in x1 */
+
+/*   put it back in the code */
+	ldr	x30,[x9, #HYPLET_OPCODE]
+
+/*	flush cache */
+	ic      ivau, x30
+    dsb     ish
+
 /*
  	generate the program
 */
