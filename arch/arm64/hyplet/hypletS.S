@@ -338,8 +338,8 @@ ENTRY(hyplet_run_user)
 	msr 	spsel,x1
 
 	msr 	cntvoff_el2,xzr
-	pop x0,	xzr
-	msr sp_el0,x0
+	pop 	x0,	xzr
+	msr 	sp_el0,x0
 	pop_registers
 
 	ret
