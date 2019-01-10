@@ -1,4 +1,4 @@
-ccflags-y +=  -Iarch/arm64/truly/ -D__HYPLET__ -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
+ccflags-y +=   -D__HYPLET__ -D__HYPLET_VM__ -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
 obj-$(CONFIG_HYPLET) += \
 	hyplet_mmu.o \
 	hypletS.o \
@@ -6,5 +6,6 @@ obj-$(CONFIG_HYPLET) += \
 	hyplet_gic.o \
 	hyplet_rpc.o \
 	hyp-init.o \
-	truly_arm.o \
+	hyplet_arm.o \
+	hyplet_ipa.o \
 	mmu.o

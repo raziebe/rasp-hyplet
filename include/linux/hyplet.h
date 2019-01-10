@@ -105,18 +105,22 @@ struct hyplet_vm {
 	unsigned long user_arg3;
 	unsigned long user_arg4;
 	unsigned long elr_el2;
+	unsigned long el2_log;
 
 	unsigned long hyplet_stack;	// this core hyplet stack
 	unsigned long user_hyplet_code;	// this core hyplet codes
-
+	
 	struct task_struct *tsk;
  	struct list_head callbacks_lst;
  	spinlock_t lst_lock;
-
+ 	unsigned long pg_lvl_one;
  	struct list_head hyp_addr_lst;
  	unsigned long state __attribute__ ((packed));
 	unsigned long faulty_elr_el2 __attribute__ ((packed));
 	unsigned long faulty_esr_el2 __attribute__ ((packed));
+	unsigned long vtcr_el2;
+	unsigned long vttbr_el2;
+	unsigned long hcr_el2;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
@@ -129,48 +133,46 @@ extern char __hyplet_vectors[];
 
 int  		hyplet_init(void);
 void 		hyplet_smp_run_hyp(void);
-void 		hyplet_on(void *);
+
 void 		hyplet_setup(void);
-long 		hyplet_call_hyp(void *hyper_func, ...);
-void 		hyplet_set_vectors(unsigned long vbar_el2);
-unsigned long 	hyplet_get_vectors(void);
+
+
 int  		hyplet_map_user_data(int ops ,  void *action);
+struct hyplet_ctrl;
+int 		hyplet_map_user(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl);
 int  		hyplet_trap_irq(struct hyplet_vm *, int irq);
 int  		hyplet_untrap_irq(struct hyplet_vm *,int irq);
 int  		hyplet_start(void);
 
-void 		hyplet_invld_tlb(unsigned long);
+
 void 		hyplet_free_mem(struct hyplet_vm *tv);
 void 		hyplet_reset(struct task_struct *tsk);
 void 		hyplet_user_unmap(unsigned long umem);
 
 int  		hyplet_run(int irq);
 int  		hyplet_trapped_irq(struct hyplet_vm *);
-int  		hyplet_run_user(void);
-int		hyplet_dump_irqs(void);
+int			hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
-unsigned long   hyplet_clear_cache(pte_t* addr,long size);
-unsigned long   hyplet_smp_rpc(long val);
+
+
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 		hyplet_set_cxt(long addr);
 int 		hyplet_imp_timer(struct hyplet_vm *);
-void 		hyplet_trap_on(void);
-void 		hyplet_trap_off(void);
-int 		hyplet_check_mapped(struct hyplet_vm *,void *action);
-int		hyplet_map_user(struct hyplet_vm *);
+struct hyplet_map_addr;
+int 		hyplet_check_mapped(struct hyplet_vm *,struct hyplet_map_addr* action);
 void 		hyplet_offlet(unsigned int cpu);
-void		hyplet_invld_all_tlb(void);
 
-void		 offlet_register(struct hyp_wait* hypevent,int cpu);
-void		 offlet_unregister(struct hyp_wait* hypevent,int cpu);
-
+void 		hyplet_init_ipa(void);
+struct hyplet_vm* hyplet_get_vm(void);
+unsigned 	long hyplet_get_tcr_el1(void);
+void 			make_vtcr_el2(struct hyplet_vm *tvm);
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
 
 
 #define hyplet_info(fmt, ...) \
-		pr_info("hyplet %s [%i]: " fmt, __func__,raw_smp_processor_id(), ## __VA_ARGS__)
+		pr_info("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
 
 #define hyplet_err(fmt, ...) \
 		pr_err("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)

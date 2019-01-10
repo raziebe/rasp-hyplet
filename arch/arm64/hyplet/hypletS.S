@@ -3,7 +3,7 @@
 #include <asm/memory.h>
 #include <asm/asm-offsets.h>
 #include "hyp_mmu.h"
-#include "tp_hyp_flags.h"
+#include "hyp_flags.h"
 
 .text
 .pushsection	.hyp.text, "ax" // borrow  hyp.text
@@ -141,6 +141,19 @@ ENDPROC(__hyplet_panic)
 __hyp_panic_str:
 	.ascii	"hyplet panic:\nCode:%08x PC:%016x ESR:%08x\nFAR:%016x" \
 	" HPFAR:%016x RAZDBG:%p\nTrulyCxt:%p\n\0"
+
+ENTRY(hyplet_flush_el2_dcache)
+	dc      civac, x0     // clean & invalidate D line / unified line
+   	dsb     ish
+	ret
+ENDPROC(hyplet_flush_el2_dcache)
+
+ENTRY(hyplet_flush_el2_icache)
+    ic      ivau, x0
+   	dsb     ish
+	ret
+ENDPROC(hyplet_flush_el2_icache)
+
 
 ENTRY(hyplet_get_tcr_el1)
 	mrs     x0, tcr_el1
@@ -282,18 +295,18 @@ ENDPROC(hyplet_call_hyp)
 /*
  * turn on brk trap
 */
-ENTRY(hyplet_trap_on)
+ENTRY(hyplet_mdcr_on)
 	mov	x0, #0x100
 	msr mdcr_el2,x0
 	ret
-ENDPROC(hyplet_trap_on)
+ENDPROC(hyplet_mdcr_on)
 /*
  * turn off brk trap
 */
-ENTRY(hyplet_trap_off)
+ENTRY(hyplet_mdcr_off)
 	msr mdcr_el2,xzr
 	ret
-ENDPROC(hyplet_trap_off)
+ENDPROC(hyplet_mdcr_off)
 
 /*
  *	Executing ISR hyplet
@@ -327,19 +340,18 @@ ENTRY(hyplet_run_user)
 	msr  	 spsel,x9
 
 	blr 	x30 // Execute hyplet in EL2
-/* save return value */
-	mrs	 x9, tpidr_el2
-	str	 x0,[x9,#HYPLET_ARG1]
 /*
  * switch stacks back
 */
+	mrs		x9, tpidr_el2
+	str		x0, [x9,#HYPLET_ARG1]
 	mrs 	x1, spsel
 	orr 	w1, w1, #0x1
 	msr 	spsel,x1
 
 	msr 	cntvoff_el2,xzr
-	pop 	x0,	xzr
-	msr 	sp_el0,x0
+	pop x0,	xzr
+	msr sp_el0,x0
 	pop_registers
 
 	ret
@@ -389,12 +401,18 @@ ENTRY(hyplet_on)
 	kern_hyp_va  x0	// grab tvm
 	msr	tpidr_el2, x0	// save tvm context
 
-// enable MMU
-	mov		x0, #1
-	lsl     x0, x0, #HCR_RW_SHIFT
-	msr		hcr_el2, x0
 
 	msr 	mdcr_el2, xzr
+    msr 	hstr_el2, xzr
+
+    ldr     x1, [x0, #HYPLET_VTCR_EL2]
+    msr     vtcr_el2, x1
+
+	ldr     x1, [x0, #HYPLET_VTTBR_EL2]
+    msr 	vttbr_el2, x1
+
+    ldr     x1, [x0, #HYPLET_HCR_EL2]
+	msr		hcr_el2, x1
 
 	pop 	x2,x3
 	pop 	x0,x1
@@ -406,7 +424,7 @@ ENDPROC(hyplet_on)
 
 .align 11
 ENTRY(__hyplet_vectors)
-	ventry		hyplet_abort_isr
+		ventry		hyplet_abort_isr
         invalid_vector  EL2_irq_invalid,#2                 // IRQ EL2t
         invalid_vector  EL2_fiq_invalid,#3                // FIQ EL2t
         invalid_vector  EL2_error_invalid,#4             // Error EL2t

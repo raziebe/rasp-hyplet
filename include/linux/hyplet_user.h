@@ -12,7 +12,13 @@ typedef enum {
 	   HYPLET_IMP_TIMER = 8,
 	   OFFLET_SET_CALLBACK = 9,
 	   HYPLET_WAIT = 10,
-}hyplet_ops;
+	   HYPLET_EXECUTE = 11, // would execute the mapped hyplet 
+	   HYPLET_REGISTER_PRINT = 12,
+	   HYPLET_MAP = 13,
+	   HYPLET_MAP_VMA = 14,
+	   HYPLET_MDCR_ON = 15,
+	   HYPLET_MDCR_OFF = 16
+} hyplet_ops;
 
 
 struct hyplet_map_addr {
@@ -32,17 +38,12 @@ struct hyplet_rpc_set {
 
 struct hyplet_ctrl {
 	int cmd  __attribute__ ((packed));
+	int irq  __attribute__ ((packed));
+	int cpu  __attribute__ ((packed));
+	int timeout_ms  __attribute__ ((packed));
 
-	union  {
-		struct hyplet_map_addr 	addr ;
-		struct hyplet_rpc_set 	rpc_set_func;
-	} __action  __attribute__ ((packed));
-
-	union {
-		int irq;
-		int cpu;
-		int timeout_ms;
-	}__resource  __attribute__ ((packed));
+	struct hyplet_map_addr 	addr;
+	struct hyplet_rpc_set 	rpc_set_func; 
 };
 
 #endif

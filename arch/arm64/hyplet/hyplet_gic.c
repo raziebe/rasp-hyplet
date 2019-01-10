@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
+#include "hypletS.h"
 
 int hyplet_imp_timer(struct hyplet_vm *hyp)
 {

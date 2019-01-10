@@ -12,7 +12,11 @@
 
 #include <linux/hyplet.h>
 #include <linux/hyplet_user.h>
-#include <linux/tp_mmu.h>
+#include "hyp_mmu.h"
+#include "hypletS.h"
+
+int hyplet_map_user_vma(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl);
+int hyplet_map_user(struct hyplet_vm *hyp,struct hyplet_ctrl *hypctl);
 
 DEFINE_PER_CPU(struct hyplet_vm, HYPLETS);
 
@@ -20,7 +24,7 @@ struct hyplet_vm* hyplet_get(int cpu){
 	return &per_cpu(HYPLETS, cpu);
 }
 
-static struct hyplet_vm* hyplet_get_vm(void){
+struct hyplet_vm* hyplet_get_vm(void){
 	return this_cpu_ptr(&HYPLETS);
 }
 /*
@@ -84,6 +88,7 @@ void hyplet_setup(void)
 		hyplet_info("vbar_el2 should restore\n");
 		hyplet_set_vectors(vbar_el2);
 	}
+	printk("Hyplet Setup %lx\n",(long)hyp);
 	hyplet_call_hyp(hyplet_on, hyp);
 }
 
@@ -95,7 +100,6 @@ int is_hyplet_on(void)
 
 void __close_hyplet(void *task, struct hyplet_vm *hyp)
 {
-	int offlet_mode = 0;
 	struct task_struct *tsk;
 	tsk =  (struct task_struct *)task;
 
@@ -103,12 +107,11 @@ void __close_hyplet(void *task, struct hyplet_vm *hyp)
 		return;
 
 	if (!(hyp->state & HYPLET_OFFLINE_ON))
-		hyplet_call_hyp(hyplet_trap_off);
-
+		hyplet_call_hyp(hyplet_mdcr_off);
+	hyplet_call_hyp(hyplet_mdcr_off);
 	hyp->tsk = NULL;
 	smp_mb();
 	while (hyp->state & HYPLET_OFFLINE_RUN) {
-		offlet_mode = 1;
 		msleep(1);
 		hyplet_debug("Waiting for offlet to exit..\n");
 	}
@@ -116,8 +119,7 @@ void __close_hyplet(void *task, struct hyplet_vm *hyp)
 	hyp->irq_to_trap = 0;
 	hyp->hyplet_id = 0;
 	hyp->user_hyplet_code = 0;
-	if (!offlet_mode)
-		hyplet_free_mem(hyp);
+	hyplet_free_mem(hyp);
 	hyp->state  = HYPLET_OFFLINE_ON;
 	smp_mb();
 	hyp->elr_el2 = 0;
@@ -161,14 +163,14 @@ void hyplet_reset(struct task_struct *tsk)
 
 static void signal_any(struct hyplet_vm *hyp)
 {
-    unsigned long flags;
+	unsigned long flags;
     struct hyp_wait *tmp;
 
     spin_lock_irqsave(&hyp->lst_lock, flags);
 
     list_for_each_entry(tmp, &hyp->callbacks_lst, next) {
-	tmp->offlet_action(hyp, tmp);
-    }
+		tmp->offlet_action(hyp, tmp);
+	}
     spin_unlock_irqrestore(&hyp->lst_lock, flags);
 }
 
@@ -228,17 +230,20 @@ static void wait_for_hyplet(struct hyplet_vm *hyp,int ms)
 	spin_unlock_irqrestore(&hyp->lst_lock, flags);
 }
 
-/*
- * Main offlet here.
-*/
+void set_current(void *tsk)
+{
+        asm ("msr sp_el0, %0" : "=r" (tsk));
+}
+
 void hyplet_offlet(unsigned int cpu)
 {
 	struct hyplet_vm *hyp;
 
 	hyp = hyplet_get_vm();
-	printk("Hyplet offlet : Enter %d\n",cpu);
+	printk("offlet : Enter %d %p\n",cpu, hyp->tsk);
 
 	while (hyp->state & HYPLET_OFFLINE_ON) {
+		struct task_struct *tsk = 0x00;
 		/*
 		 * Wait for an assignment.
 		 */
@@ -246,18 +251,23 @@ void hyplet_offlet(unsigned int cpu)
 				|| hyp->user_hyplet_code == 0x00){
 			cpu_relax();
 		}
-
+		tsk = hyp->tsk;
+		set_current(tsk);
 		hyp->state |= HYPLET_OFFLINE_RUN;
 
-		while (hyp->tsk != NULL) {
+		printk("hyplet offlet: Start run\n");
+		while (hyp->tsk != NULL &&
+						(hyp->user_hyplet_code != 0x00)) {
 			hyplet_call_hyp(hyplet_run_user);
 			signal_any(hyp);
 		}
-		hyplet_free_mem(hyp);
+		set_current(tsk);
+		hyplet_flush_caches(hyp);
 		hyp->state &= ~(HYPLET_OFFLINE_RUN);
 		smp_mb();
+		printk("hyplet offlet : Ended\6n");
 	}
-	printk("hyplet offlet : Exit %d\n",cpu);
+	printk("offlet : Exit %d\n",cpu);
 }
 
 int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
@@ -266,14 +276,14 @@ int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
 	 * check that the function exists
 	*/
 	if ( hyp->user_hyplet_code !=
-			hplt->__action.rpc_set_func.func_addr ){
+			hplt->rpc_set_func.func_addr ){
 		hyplet_err("User hyplet is incorrect\n");
 		return -EINVAL;
 	}
 
-	hyp->hyplet_id = hplt->__action.rpc_set_func.func_id;
+	hyp->hyplet_id = hplt->rpc_set_func.func_id;
 	hyp->tsk = current;
-	hyplet_call_hyp(hyplet_trap_on);
+	hyplet_call_hyp(hyplet_mdcr_on);
 	return 0;
 }
 
@@ -288,7 +298,7 @@ int offlet_assign(int cpu,struct hyplet_ctrl* target_hplt,struct hyplet_vm *src_
 	hyp->state  = src_hyp->state;
 	smp_mb();
 	hyp->tsk = current;
-	hyp->user_hyplet_code = target_hplt->__action.addr.addr;
+	hyp->user_hyplet_code = target_hplt->addr.addr;
 	hyp->hyplet_stack = src_hyp->hyplet_stack;
 	smp_mb();
 	printk("offlet: hyplet assigned to cpu %d\n",cpu);
@@ -302,55 +312,62 @@ int hyplet_ctl(unsigned long arg)
 	struct hyplet_ctrl hplt;
 	int rc = -1;
 
-	if (hyp->tsk
-			&& hyp->tsk->mm != current->mm) {
+	if (hyp->tsk && hyp->tsk->mm != current->mm) {
 		hyplet_err(" hyplet busy\n");
 		return -EBUSY;
 	}
 
-	if ( copy_from_user(&hplt, (void *) arg, sizeof(hplt)) ){
+	if (copy_from_user(&hplt, (void *) arg, sizeof(hplt)) ){
 		hyplet_err(" failed to copy from user");
 		return -1;
 	}
 
-	if (hplt.__resource.cpu >= 0)
-			hyp = hyplet_get(hplt.__resource.cpu);
+	if (hplt.cpu >= 0){
+		hyp = hyplet_get(hplt.cpu);
+	}
 
 	switch (hplt.cmd)
 	{
 		case HYPLET_MAP_ALL:
-				return hyplet_map_user(hyp);
+				return hyplet_map_all(hyp);
+
+		case HYPLET_MAP:
+				return hyplet_map_user(hyp, &hplt);
+
+		case HYPLET_MAP_VMA:
+				return hyplet_map_user_vma(hyp, &hplt);
 
 		case HYPLET_MAP_STACK: // If the user won't map the stack we use the current sp_el0
-				rc = hyplet_check_mapped(hyp, (void *)&hplt.__action);
-				if ( rc < 0){
+				rc = hyplet_check_mapped(hyp, &hplt.addr);
+				if ( rc == 0){
+					hyplet_info("stack 0x%lx failed, not mapped\n",hplt.addr.addr);
 					return -EINVAL;
 				}
 				hyp->hyplet_stack =
-					(long)(hplt.__action.addr.addr) +
-						hplt.__action.addr.size - PAGE_SIZE;
+					(long)(hplt.addr.addr) +
+						hplt.addr.size - PAGE_SIZE;
 				break;
 
 		case HYPLET_SET_CALLBACK:
-				rc = hyplet_check_mapped(hyp, (void *)&hplt.__action);
+				rc = hyplet_check_mapped(hyp, &hplt.addr);
 				if (rc == 0) {
 					hyplet_info("Warning: Hyplet was not mapped\n");
 				}
-				hyp->user_hyplet_code = hplt.__action.addr.addr;
+				hyp->user_hyplet_code = hplt.addr.addr;
 				break;
 
 		case OFFLET_SET_CALLBACK: // must be called in the processor in which the stack was set.
-				rc = hyplet_check_mapped(hyp, (void *)&hplt.__action);
+				rc = hyplet_check_mapped(hyp, &hplt.addr);
 				if (rc == 0) {
 					hyplet_info("Warning: Hyplet was not mapped\n");
 				}
-				return offlet_assign(hplt.__resource.cpu, &hplt, hyp);
+				return offlet_assign(hplt.cpu, &hplt, hyp);
 
 		case HYPLET_TRAP_IRQ:
-				return hyplet_trap_irq(hyp,hplt.__resource.irq);
+				return hyplet_trap_irq(hyp,hplt.irq);
 
 		case HYPLET_UNTRAP_IRQ:
-				return hyplet_untrap_irq(hyp, hplt.__resource.irq);
+				return hyplet_untrap_irq(hyp, hplt.irq);
 
 		case HYPLET_IMP_TIMER:
 				return hyplet_imp_timer(hyp);
@@ -359,9 +376,22 @@ int hyplet_ctl(unsigned long arg)
 				return hyplet_set_rpc(&hplt, hyp);
 
 		case HYPLET_WAIT:
-				 wait_for_hyplet(hyp, hplt.__resource.timeout_ms);
+				 wait_for_hyplet(hyp, hplt.timeout_ms);
 				 break;
 
+		case HYPLET_REGISTER_PRINT:
+				hyp->el2_log = hplt.addr.addr;
+				rc = 0;
+				break;
+		case HYPLET_MDCR_ON:
+				hyplet_call_hyp(hyplet_mdcr_on);
+				rc = 0;
+				break;
+
+		case HYPLET_MDCR_OFF:
+				hyplet_call_hyp(hyplet_mdcr_off);
+				rc = 0;
+				break;
 	}
 	return rc;
 }

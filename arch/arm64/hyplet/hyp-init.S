@@ -18,7 +18,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include "hyp_mmu.h"
-#include "tp_hyp_flags.h"
+#include "hyp_flags.h"
 
 #include <asm/pgtable-hwdef.h>
 
@@ -27,7 +27,7 @@
 
 	.align	11
 
-ENTRY(__tp_hyp_init)
+ENTRY(__hyplet_init_vec)
 	ventry	__invalid		// Synchronous EL2t
 	ventry	__invalid		// IRQ EL2t
 	ventry	__invalid		// FIQ EL2t
@@ -141,7 +141,7 @@ merged:
 
 	/* Hello, World! */
 	eret
-ENDPROC(__tp_hyp_init)
+ENDPROC(__hyplet_init_vec)
 
 	.ltorg
 

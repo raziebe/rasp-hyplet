@@ -157,6 +157,10 @@ int main(void)
   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
 
+  DEFINE(HYPLET_HCR_EL2, offsetof(struct hyplet_vm, hcr_el2));
+  DEFINE(HYPLET_VTCR_EL2, offsetof(struct hyplet_vm, vtcr_el2));
+  DEFINE(HYPLET_VTTBR_EL2, offsetof(struct hyplet_vm, vttbr_el2));
+
   DEFINE(HYPLET_TRAP_IRQ , offsetof(struct hyplet_vm,  irq_to_trap));
   DEFINE(HYPLET_STACK , offsetof(struct hyplet_vm,  hyplet_stack));
   DEFINE(HYPLET_CODE , offsetof(struct hyplet_vm,  user_hyplet_code ));

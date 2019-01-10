@@ -38,25 +38,25 @@
 #include <linux/hugetlb.h>
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
-#include <linux/truly.h>
+#include <linux/hyplet.h>
 #include <linux/highmem.h>
 
 #include "hyp_mmu.h"
 
 
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
-extern char __tp_hyp_init[];
+extern char __hyplet_init_vec[];
 
 static pgd_t *boot_hyp_pgd;
 pgd_t *hyp_pgd;
 static pgd_t *merged_hyp_pgd;
-static DEFINE_MUTEX(tp_hyp_pgd_mutex);
+static DEFINE_MUTEX(hyplet_mutex);
 
 static unsigned long hyp_idmap_start;
 static unsigned long hyp_idmap_end;
 static phys_addr_t hyp_idmap_vector;
 
-#define tp_pud_addr_end(addr, end)     pud_addr_end(addr, end)
+#define hyp_pud_addr_end(addr, end)     pud_addr_end(addr, end)
 
 static void clear_pgd_entry(pgd_t *pgd, phys_addr_t addr)
 {
@@ -78,7 +78,7 @@ static void clear_pud_entry(pud_t *pud, phys_addr_t addr)
 static void clear_pmd_entry(pmd_t *pmd, phys_addr_t addr)
 {
 	pte_t *pte_table = pte_offset_kernel(pmd, 0);
-	VM_BUG_ON(tp_pmd_huge(*pmd));
+	VM_BUG_ON(hyp_pmd_huge(*pmd));
 	pmd_clear(pmd);
 	pte_free_kernel(NULL, pte_table);
 	put_page(virt_to_page(pmd));
@@ -96,15 +96,15 @@ static void unmap_ptes(pmd_t *pmd,
 		if (!pte_none(*pte)) {
 			pte_t old_pte = *pte;
 
-			tp_set_pte(pte, __pte(0));
+			hyp_set_pte(pte, __pte(0));
 			/* No need to invalidate the cache for device mappings */
 			if (pfn_valid(pte_pfn(old_pte)))
-				tp_flush_dcache_pte(old_pte);
+				hyp_flush_dcache_pte(old_pte);
 			put_page(virt_to_page(pte));
 		}
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 
-	if (tp_pte_table_empty(start_pte))
+	if (hyp_pte_table_empty(start_pte))
 		clear_pmd_entry(pmd, start_addr);
 }
 
@@ -116,22 +116,22 @@ static void unmap_pmds(pud_t *pud,
 
 	start_pmd = pmd = pmd_offset(pud, addr);
 	do {
-		next = tp_pmd_addr_end(addr, end);
+		next = hyp_pmd_addr_end(addr, end);
 		if (!pmd_none(*pmd)) {
-			if (tp_pmd_huge(*pmd)) {
+			if (hyp_pmd_huge(*pmd)) {
 				pmd_t old_pmd = *pmd;
 				pmd_clear(pmd);
-				tp_flush_dcache_pmd(old_pmd);
+				hyp_flush_dcache_pmd(old_pmd);
 				put_page(virt_to_page(pmd));
 			} else {
 				pmd_t old_pmd = *pmd;
-				tp_flush_dcache_pmd(old_pmd);
+				hyp_flush_dcache_pmd(old_pmd);
 				unmap_ptes(pmd, addr, next);
 			}
 		}
 	} while (pmd++, addr = next, addr != end);
 
-	if (tp_pmd_table_empty(start_pmd))
+	if (hyp_pmd_table_empty(start_pmd))
 		clear_pud_entry( pud, start_addr);
 }
 
@@ -144,12 +144,12 @@ static void unmap_puds( pgd_t *pgd,
 
 	start_pud = pud = pud_offset(pgd, addr);
 	do {
-		next = tp_pud_addr_end(addr, end);
+		next = hyp_pud_addr_end(addr, end);
 		if (!pud_none(*pud)) {
 			if (pud_huge(*pud)) {
 				pud_t old_pud = *pud;
 				pud_clear(pud);
-				tp_flush_dcache_pud(old_pud);
+				hyp_flush_dcache_pud(old_pud);
 				put_page(virt_to_page(pud));
 			} else {
 				unmap_pmds( pud, addr, next);
@@ -157,7 +157,7 @@ static void unmap_puds( pgd_t *pgd,
 		}
 	} while (pud++, addr = next, addr != end);
 
-       if (tp_pud_table_empty(start_pud))
+       if (hyp_pud_table_empty(start_pud))
                 clear_pgd_entry(pgd, start_addr);
 
 }
@@ -171,7 +171,7 @@ static void unmap_range(pgd_t *pgdp,
 
 	pgd = pgdp + pgd_index(addr);
 	do {
-		next = tp_pgd_addr_end(addr, end);
+		next = hyp_pgd_addr_end(addr, end);
 		if (!pgd_none(*pgd))
 			unmap_puds(pgd, addr, next);
 	} while (pgd++, addr = next, addr != end);
@@ -184,7 +184,7 @@ static void unmap_range(pgd_t *pgdp,
  */
 void free_boot_hyp_pgd(void)
 {
-	mutex_lock(&tp_hyp_pgd_mutex);
+	mutex_lock(&hyplet_mutex);
 
 	if (boot_hyp_pgd) {
 		unmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
@@ -196,7 +196,7 @@ void free_boot_hyp_pgd(void)
 	if (hyp_pgd)
 		unmap_range( hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
 
-	mutex_unlock(&tp_hyp_pgd_mutex);
+	mutex_unlock(&hyplet_mutex);
 }
 
 void free_hyp_pgds(void)
@@ -205,7 +205,7 @@ void free_hyp_pgds(void)
 
 	free_boot_hyp_pgd();
 
-	mutex_lock(&tp_hyp_pgd_mutex);
+	mutex_lock(&hyplet_mutex);
 
 	if (hyp_pgd) {
 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
@@ -222,7 +222,7 @@ void free_hyp_pgds(void)
 		merged_hyp_pgd = NULL;
 	}
 
-	mutex_unlock(&tp_hyp_pgd_mutex);
+	mutex_unlock(&hyplet_mutex);
 }
 
 static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
@@ -235,9 +235,9 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
 	addr = start;
 	do {
 		pte = pte_offset_kernel(pmd, addr);
-		tp_set_pte(pte, pfn_pte(pfn, prot));
+		hyp_set_pte(pte, pfn_pte(pfn, prot));
 		get_page(virt_to_page(pte));
-		tp_flush_dcache_to_poc(pte, sizeof(*pte));
+		hyp_flush_dcache_to_poc(pte, sizeof(*pte));
 		pfn++;
 	} while (addr += PAGE_SIZE, addr != end);
 }
@@ -264,7 +264,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
 			}
 			pmd_populate_kernel(NULL, pmd, pte);
 			get_page(virt_to_page(pmd));
-			tp_flush_dcache_to_poc(pmd, sizeof(*pmd));
+			hyp_flush_dcache_to_poc(pmd, sizeof(*pmd));
 		}
 
 		next = pmd_addr_end(addr, end);
@@ -297,7 +297,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
 			}
 			pud_populate(NULL, pud, pmd);
 			get_page(virt_to_page(pud));
-			tp_flush_dcache_to_poc(pud, sizeof(*pud));
+			hyp_flush_dcache_to_poc(pud, sizeof(*pud));
 		}
 
 		next = pud_addr_end(addr, end);
@@ -329,7 +329,7 @@ int __create_hyp_mappings(pgd_t *pgdp,
 	unsigned long addr, next;
 	int err = 0;
 
-	mutex_lock(&tp_hyp_pgd_mutex);
+	mutex_lock(&hyplet_mutex);
 	addr = start & PAGE_MASK;
 	end = PAGE_ALIGN(end);
 	do {
@@ -344,7 +344,7 @@ int __create_hyp_mappings(pgd_t *pgdp,
 			}
 			pgd_populate(NULL, pgd, pud);
 			get_page(virt_to_page(pgd));
-			tp_flush_dcache_to_poc(pgd, sizeof(*pgd));
+			hyp_flush_dcache_to_poc(pgd, sizeof(*pgd));
 		}
 
 		next = pgd_addr_end(addr, end);
@@ -354,11 +354,11 @@ int __create_hyp_mappings(pgd_t *pgdp,
 		pfn += (next - addr) >> PAGE_SHIFT;
 	} while (addr = next, addr != end);
 out:
-	mutex_unlock(&tp_hyp_pgd_mutex);
+	mutex_unlock(&hyplet_mutex);
 	return err;
 }
 
-static phys_addr_t tp_kaddr_to_phys(void *kaddr)
+static phys_addr_t kaddr_to_phys(void *kaddr)
 {
 	if (!is_vmalloc_addr(kaddr)) {
 		BUG_ON(!virt_addr_valid(kaddr));
@@ -391,7 +391,7 @@ int create_hyp_mappings(void *from, void *to,pgprot_t prot)
 	for (virt_addr = start; virt_addr < end; virt_addr += PAGE_SIZE) {
 		int err;
 
-		phys_addr = tp_kaddr_to_phys(from + virt_addr - start);
+		phys_addr = kaddr_to_phys(from + virt_addr - start);
 		err = __create_hyp_mappings(hyp_pgd, virt_addr,
 					    virt_addr + PAGE_SIZE,
 					    __phys_to_pfn(phys_addr),
@@ -403,28 +403,28 @@ int create_hyp_mappings(void *from, void *to,pgprot_t prot)
 	return 0;
 }
 
-phys_addr_t tp_mmu_get_httbr(void)
+phys_addr_t hyp_mmu_get_httbr(void)
 {
 	return virt_to_phys(hyp_pgd);
 }
 
-phys_addr_t tp_mmu_get_boot_httbr(void)
+phys_addr_t hyp_mmu_get_boot_httbr(void)
 {
 	return virt_to_phys(boot_hyp_pgd);
 }
 
-phys_addr_t tp_get_idmap_vector(void)
+phys_addr_t hyp_get_idmap_vector(void)
 {
 	return hyp_idmap_vector;
 }
 
-int tp_mmu_init(void)
+int hyp_mmu_init(void)
 {
 	int err;
 
 	hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
 	hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
-	hyp_idmap_vector = virt_to_phys(__tp_hyp_init);
+	hyp_idmap_vector = virt_to_phys(__hyplet_init_vec);
 
 	/*
 	 * We rely on the linker script to ensure at build time that the HYP
