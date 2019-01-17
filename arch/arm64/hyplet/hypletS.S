@@ -174,6 +174,16 @@ ENTRY(hyplet_invld_all_tlb)
 	ret
 ENDPROC(hyplet_invld_all_tlb)
 
+ENTRY(read_mair_el2)
+	mrs x0, mair_el2
+        ret
+ENDPROC(read_mair_el2)
+
+ENTRY(set_mair_el2)
+	msr mair_el2,x0
+   	ret
+ENDPROC(set_mair_el2)
+
 /* 
   x0 address
   x1 size

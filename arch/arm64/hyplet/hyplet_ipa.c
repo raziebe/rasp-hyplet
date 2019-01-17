@@ -3,7 +3,7 @@
 #include <linux/hyplet.h>
 #include <linux/delay.h>
 #include "hyp_mmu.h"
-
+#include "hypletS.h"
 
 //
 // alloc 512 * 4096  = 2MB
@@ -181,5 +181,18 @@ void make_vtcr_el2(struct hyplet_vm *vm)
 	    (vtcr_el2_tg0 << VTCR_EL2_TG0_BIT_SHIFT) |
 	    (vtcr_el2_ps << VTCR_EL2_PS_BIT_SHIFT);
 
+}
+
+/*
+ * the page us using attr_ind 4
+ */
+void make_mair_el2(struct hyplet_vm *vm)
+{
+	unsigned long mair_el2;
+
+	mair_el2 = hyplet_call_hyp(read_mair_el2);
+	vm->mair_el2 = (mair_el2 & 0x000000FF00000000L ) | 0x000000FF00000000L; //
+	//tvm->mair_el2 = 0xFFFFFFFFFFFFFFFFL;
+ 	hyplet_call_hyp(set_mair_el2, vm->mair_el2);
 }
 

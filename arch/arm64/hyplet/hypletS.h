@@ -17,5 +17,6 @@ void		hyplet_flush_el2_dcache(unsigned long va);
 unsigned long   hyplet_clear_cache(pte_t* addr,long size);
 void 		hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long 	hyplet_get_vectors(void);
-
+unsigned long    read_mair_el2(void);
+void 		 set_mair_el2(unsigned long);
 #endif

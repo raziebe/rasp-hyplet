@@ -77,6 +77,7 @@ static void cpu_init_hyp_mode(void *discard)
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 	hyp = hyplet_get_vm();
 
+	make_mair_el2(hyp);
 	hyplet_call_hyp(hyplet_on, hyp);
 }
 

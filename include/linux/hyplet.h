@@ -121,6 +121,7 @@ struct hyplet_vm {
 	unsigned long vtcr_el2;
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
+	unsigned long mair_el2;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
@@ -169,7 +170,7 @@ struct hyplet_vm* hyplet_get_vm(void);
 unsigned 	long hyplet_get_tcr_el1(void);
 void 			make_vtcr_el2(struct hyplet_vm *tvm);
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
-
+void make_mair_el2(struct hyplet_vm *vm);
 
 #define hyplet_info(fmt, ...) \
 		pr_info("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)
