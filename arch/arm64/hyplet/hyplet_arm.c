@@ -267,8 +267,9 @@ static int hyplet_arch_init(void)
 		hyp->hcr_el2 =  this_hyp->hcr_el2;
 		hyp->vtcr_el2 = this_hyp->vtcr_el2;
 		hyp->vttbr_el2 = this_hyp->vttbr_el2;
-
+		hyp->mair_el2 = this_hyp->mair_el2;
 	}
+
 	on_each_cpu(cpu_init_hyp_mode, NULL,1);
 	if (this_hyp->hcr_el2 & HCR_VM) {
 		hyplet_info("Microvisor VM Initialized\n");
