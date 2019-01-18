@@ -27,7 +27,26 @@ void create_level_three(struct page *pg, long *addr)
 			(0b11 << DESC_SHREABILITY_SHIFT) |
 			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |	/* leave stage 1 unchanged see 1795 */
 		   	 DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
+#if defined(__SHOW_VM__)
+/*
+  We put the zero page instead of eth0 address. When the system boots
+  then eth0 will fail to run. This proves that VM exists.
+*/
+		{
+		long eth0_addr = 0x000000003f980000LL;
+                if ( (*addr) == eth0_addr) {
+                        long z = (long) page_to_phys(ZERO_PAGE(0));
 
+                        hyp_info("Crashing addr = %lx zpg=%lx\n",
+                                        *addr
+                                        ,z )  ;
+
+                        l3_descriptor[i] = (DESC_AF) | (0b11 << DESC_SHREABILITY_SHIFT) |
+                                (0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |
+                                 DESC_TABLE_BIT | DESC_VALID_BIT | (long)z;
+                    }
+		}
+#endif
 		(*addr) += PAGE_SIZE;
 	}
 	kunmap(pg);
