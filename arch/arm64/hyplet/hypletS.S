@@ -74,6 +74,10 @@ EL1_sync:
 
 	cmp x2, #ESR_ELx_EC_BRK64	// user space performed watchpoint
 	b.eq 4f
+
+	cmp x2, #ESR_ELx_EC_DABT_LOW
+	b.eq 5f
+
 	cmp	x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
 	b.ne 	3f
 
@@ -85,6 +89,12 @@ EL1_sync:
 	cbnz	x0, 1f
 	mrs	x0, vbar_el2
 	b	2f
+
+5:
+	pop x2,x3
+	pop x0,x1
+	b	hyplet_abrt_low
+
 
 1:	push	lr, xzr	
 	/*
@@ -213,6 +223,28 @@ ENTRY(hyplet_clear_cache)
         isb
         ret
 ENDPROC(hyplet_clear_cache)
+
+
+ENTRY(hyplet_abrt_low)
+	push_registers
+/*
+* Peform virtual to physical
+*/
+	mrs x0, far_el2
+	at  S12E1R, x0
+	mrs	x1, par_el1
+	kern_hyp_va x1
+	mrs x0, tpidr_el2
+	bl hyplet_handle_abrt
+/*
+	skip the faulting command
+*/
+	mrs x1, elr_el2
+	add x1, x1, #4
+	msr	elr_el2, x1
+	pop_registers
+	eret
+ENDPROC(hyplet_abrt_low)
 
 // Called by a brk trap
 

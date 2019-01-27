@@ -75,6 +75,11 @@
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
 
+#define S2_PAGE_ACCESS_NONE	0b00
+#define S2_PAGE_ACCESS_R	0b01
+#define S2_PAGE_ACCESS_W	0b10
+#define S2_PAGE_ACCESS_RW	0b11
+
 #define __hyp_text __section(.hyp.text) notrace
 
 #define __int8  char
@@ -95,6 +100,13 @@ struct hyp_addr {
 
 };
 
+/*
+ *
+ */
+struct virtual_device_access {
+	unsigned long last_current;
+	unsigned long count;
+};
 
 struct hyplet_vm {
 	unsigned int irq_to_trap __attribute__ ((packed));
@@ -122,6 +134,7 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
+	struct virtual_device_access dev_access;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
