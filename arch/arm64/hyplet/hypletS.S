@@ -231,7 +231,7 @@ ENTRY(hyplet_abrt_low)
 * Peform virtual to physical
 */
 	mrs x0, far_el2
-	at  S12E1R, x0
+	at  S1E1R, x0
 	mrs	x1, par_el1
 	kern_hyp_va x1
 	mrs x0, tpidr_el2
