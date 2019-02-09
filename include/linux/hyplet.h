@@ -101,9 +101,10 @@ struct hyp_addr {
 };
 
 /*
- *
+ * Statitics about the faulting address
  */
 struct virtual_device_access {
+	unsigned long faulted_phys_addr;
 	unsigned long last_current;
 	unsigned long count;
 };

@@ -238,7 +238,7 @@ static int hyplet_arch_init(void)
 		}
 	}
 
-	printk("HYP mode is available rc-24\n");
+	printk("HYP mode is available rc-25\n");
 	err = init_hyp_mode();
 	if (err)
 		return -1;
