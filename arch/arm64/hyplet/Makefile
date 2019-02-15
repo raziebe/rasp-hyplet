@@ -9,4 +9,5 @@ obj-$(CONFIG_HYPLET) += \
 	hyplet_arm.o \
 	hyplet_ipa.o \
 	malware_trap.o \
+	virt_dw3_usb.o \
 	mmu.o

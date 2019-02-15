@@ -53,10 +53,9 @@ int hyplet_init(void)
 }
 
 
-void hyplet_map(void)
+void hyplet_map_to_el2(struct hyplet_vm *hyp)
 {
 	int err;
-	struct hyplet_vm *hyp = hyplet_get_vm();
 
 	err = create_hyp_mappings(hyp, hyp + 1, PAGE_HYP);
 	if (err) {
@@ -66,6 +65,14 @@ void hyplet_map(void)
 		hyplet_info("Mapped hyplet state");
 	}
 
+	err = create_hyp_mappings(hyp->dev_access, hyp->dev_access + 1, PAGE_HYP);
+	if (err) {
+		hyplet_err("Failed to map hyplet virt device");
+		return;
+	} else {
+		hyplet_info("Mapped hyplet virt device");
+	}
+
 }
 
 int __hyp_text is_hyp(void)
@@ -73,23 +80,6 @@ int __hyp_text is_hyp(void)
         u64 el;
         asm("mrs %0,CurrentEL" : "=r" (el));
         return el == CurrentEL_EL2;
-}
-
-void hyplet_setup(void)
-{
-	struct hyplet_vm *hyp = hyplet_get_vm();
-	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__hyplet_vectors);
-	unsigned long vbar_el2_current;
-
-	hyplet_map();
-	
-	vbar_el2_current = hyplet_get_vectors();
-	if (vbar_el2 != vbar_el2_current) {
-		hyplet_info("vbar_el2 should restore\n");
-		hyplet_set_vectors(vbar_el2);
-	}
-	printk("Hyplet Setup %lx\n",(long)hyp);
-	hyplet_call_hyp(hyplet_on, hyp);
 }
 
 int is_hyplet_on(void)

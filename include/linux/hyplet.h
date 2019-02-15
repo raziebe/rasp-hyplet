@@ -72,6 +72,9 @@
 #define USER_TO_HYP(uva)	(uva)
 #define HYPLET_HCR_FLAGS 	(HCR_RW)
 
+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
+
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
 
@@ -90,6 +93,9 @@ typedef unsigned __int8 UCHAR;
 #define USER_CODE_MAPPED		(UL(1) << 0)
 #define HYPLET_OFFLINE_ON		(UL(1) << 1)
 #define HYPLET_OFFLINE_RUN		(UL(1) << 2)
+#define FAULT_MMIO_TO_EL2		0b10
+#define FAULT_MAPPED_TO_EL2		0b01
+#define FAULT_MAX_HANDLERS 10
 
 struct hyp_addr {
 	struct list_head lst;
@@ -100,13 +106,32 @@ struct hyp_addr {
 
 };
 
+struct hyplet_vm;
+struct hyplet_driver_handler;
+
+struct hyplet_driver_handler {
+	int offset;
+	void (*action)(struct hyplet_vm *, struct hyplet_driver_handler*);
+};
+
+struct stage2_fault_addr {
+	unsigned long real_phys_addr;
+	unsigned long *stg2_desc_pg;
+	void *fake_vaddr;
+	unsigned long fake_phys_addr;
+	int stg2_desc_idx;
+	int flags;
+};
+
 /*
- * Statitics about the faulting address
+ * Statistics about the faulting address
  */
-struct virtual_device_access {
+struct virt_dev_access {
 	unsigned long faulted_phys_addr;
 	unsigned long last_current;
 	unsigned long count;
+	struct stage2_fault_addr faddr;
+	struct hyplet_driver_handler hyphnd[FAULT_MAX_HANDLERS];
 };
 
 struct hyplet_vm {
@@ -135,7 +160,7 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
-	struct virtual_device_access dev_access;
+	struct virt_dev_access* dev_access;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
@@ -178,7 +203,7 @@ int 		hyplet_imp_timer(struct hyplet_vm *);
 struct hyplet_map_addr;
 int 		hyplet_check_mapped(struct hyplet_vm *,struct hyplet_map_addr* action);
 void 		hyplet_offlet(unsigned int cpu);
-
+void 		hyplet_map_to_el2(struct hyplet_vm *hyp);
 void 		hyplet_init_ipa(void);
 struct hyplet_vm* hyplet_get_vm(void);
 unsigned 	long hyplet_get_tcr_el1(void);
