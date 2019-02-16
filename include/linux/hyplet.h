@@ -108,6 +108,7 @@ struct hyp_addr {
 
 struct hyplet_vm;
 struct hyplet_driver_handler;
+typedef void (*__action__mmio__)(struct hyplet_vm *, struct hyplet_driver_handler*);
 
 struct hyplet_driver_handler {
 	int offset;
@@ -121,11 +122,9 @@ struct stage2_fault_addr {
 	unsigned long fake_phys_addr;
 	int stg2_desc_idx;
 	int flags;
+	int last_offset;
 };
 
-/*
- * Statistics about the faulting address
- */
 struct virt_dev_access {
 	unsigned long faulted_phys_addr;
 	unsigned long last_current;
