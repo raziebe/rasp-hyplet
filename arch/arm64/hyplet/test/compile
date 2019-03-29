@@ -11,10 +11,7 @@ READELF=/opt/${GCC}/bin/aarch64-linux-gnu-readelf
 OBJDUMP=/opt/${GCC}/bin/aarch64-linux-gnu-objdump
 STRIP=/opt/${GCC}/bin/aarch64-linux-gnu-strip
 
-# simple isr hyplet
-$CC --static  -I ../../../../include offlet_timer.c hyplet_utilsS.S hyplet_utils.c -o timer
-$CC --static   -I ../../../../include offlet_print.c hyplet_utils.c  hyplet_utilsS.S  -o offprint
-$CC --static   -I ../../../../include iar_recv2.c hyplet_utils.c  hyplet_utilsS.S  -o iar_rcv_offlet2 
-
-$CC --static   -I ../../../../include ultrasonic_hyplet.c hyplet_utils.c  hyplet_utilsS.S  -o  ultrasonic_hyplet
-$STRIP ultrasonic_hyplet
+#
+# c-flat
+#
+$CC --static  -I ../../../../include cflat-rpc.c hyplet_utilsS.S hyplet_utils.c -o cflat
