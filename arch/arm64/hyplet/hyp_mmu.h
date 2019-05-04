@@ -63,6 +63,7 @@ void free_hyp_pgds(void);
 int hyp_mmu_init(void);
 
 
+
 void __hyp_text hyp_flush_tlb(unsigned long vaddr);
 unsigned long __hyp_text truly_get_sp_el2(void);
 

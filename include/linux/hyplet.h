@@ -69,8 +69,12 @@
 #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
 #define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+#define HYP_TO_KERN(hpa)	((unsigned long)hpa + PAGE_OFFSET - HYP_PAGE_OFFSET)
 #define USER_TO_HYP(uva)	(uva)
 #define HYPLET_HCR_FLAGS 	(HCR_RW)
+
+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
 
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
@@ -82,6 +86,7 @@
 
 #define __hyp_text __section(.hyp.text) notrace
 
+
 #define __int8  char
 typedef unsigned __int8 UCHAR;
 
@@ -90,6 +95,9 @@ typedef unsigned __int8 UCHAR;
 #define USER_CODE_MAPPED		(UL(1) << 0)
 #define HYPLET_OFFLINE_ON		(UL(1) << 1)
 #define HYPLET_OFFLINE_RUN		(UL(1) << 2)
+#define FAULT_MMIO_TO_EL2		0b10
+#define FAULT_MAPPED_TO_EL2		0b01
+#define FAULT_MAX_HANDLERS 10
 
 struct hyp_addr {
 	struct list_head lst;
@@ -100,12 +108,23 @@ struct hyp_addr {
 
 };
 
-/*
- *
- */
-struct virtual_device_access {
+struct hyplet_vm;
+
+
+struct stage2_fault_addr {
+	unsigned long real_phys_addr;
+	unsigned long *stg2_desc_pg;
+	void *fake_vaddr;
+	unsigned long fake_phys_addr;
+	int stg2_desc_idx;
+	int flags;
+};
+
+struct virt_dev_access {
+	unsigned long faulted_phys_addr;
 	unsigned long last_current;
 	unsigned long count;
+	struct stage2_fault_addr faddr;
 };
 
 struct hyplet_vm {
@@ -125,7 +144,9 @@ struct hyplet_vm {
 	struct task_struct *tsk;
  	struct list_head callbacks_lst;
  	spinlock_t lst_lock;
+ 	unsigned long* ipa_desc_zero;
  	unsigned long pg_lvl_one;
+ 	unsigned long *vttbr_el2_kern;
  	struct list_head hyp_addr_lst;
  	unsigned long state __attribute__ ((packed));
 	unsigned long faulty_elr_el2 __attribute__ ((packed));
@@ -134,7 +155,9 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
-	struct virtual_device_access dev_access;
+	s64 hyp_memstart_addr;	/* memstart_addr is use deduct the physical address */
+	int ipa_pages;
+	int ipa_pages_processed;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
@@ -177,13 +200,20 @@ int 		hyplet_imp_timer(struct hyplet_vm *);
 struct hyplet_map_addr;
 int 		hyplet_check_mapped(struct hyplet_vm *,struct hyplet_map_addr* action);
 void 		hyplet_offlet(unsigned int cpu);
-
+void 		hyplet_map_to_el2(struct hyplet_vm *hyp);
 void 		hyplet_init_ipa(void);
 struct hyplet_vm* hyplet_get_vm(void);
 unsigned 	long hyplet_get_tcr_el1(void);
 void 			make_vtcr_el2(struct hyplet_vm *tvm);
 unsigned long __hyp_text get_hyplet_addr(int hyplet_id,struct hyplet_vm * hyp);
-void make_mair_el2(struct hyplet_vm *vm);
+void 	make_mair_el2(struct hyplet_vm *vm);
+int 	map_ipa_to_el2(struct hyplet_vm *vm);
+void 	__hyp_text   walk_ipa_el2(struct hyplet_vm *vm,int s2_page_access);
+unsigned long*  ipa_find_page_desc(struct hyplet_vm *vm,unsigned long phy_addr);
+int is_hyp(void);
+unsigned long __hyp_phys_to_virt(unsigned long addr,struct hyplet_vm *vm);
+void test_ipa_settings(void);
+void hyplet_invld_ipa_tlb(unsigned long phy_addr);
 
 #define hyplet_info(fmt, ...) \
 		pr_info("hyplet [%i]: " fmt, raw_smp_processor_id(), ## __VA_ARGS__)

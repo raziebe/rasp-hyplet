@@ -2,35 +2,36 @@
 #include <linux/highmem.h>
 #include <linux/hyplet.h>
 #include <linux/delay.h>
+#include "acqusition_trap.h"
 #include "hyp_mmu.h"
 #include "hypletS.h"
-#include "malware_trap.h"
 
+
+extern s64 memstart_addr;
 //
 // alloc 512 * 4096  = 2MB
 //
 void create_level_three(struct page *pg, long *addr)
 {
 	int i;
-	long *l3_descriptor;
+	long *l3_desc;
 
-	l3_descriptor = (long *) kmap(pg);
-	if (l3_descriptor == NULL) {
+	l3_desc = (long *) kmap(pg);
+	if (l3_desc == NULL) {
 		printk("%s desc NULL\n", __func__);
 		return;
 	}
-
+	memset(l3_desc, 0x00, PAGE_SIZE);
 	for (i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
 		/*
 		 * Memory attribute fields in the VMSAv8-64 translation table format descriptors
 		 */
-		l3_descriptor[i] = (DESC_AF) |
+		l3_desc[i] = (DESC_AF) |
 				(0b11 << DESC_SHREABILITY_SHIFT) |
 				/* The S2AP data access permissions, Non-secure EL1&0 translation regime  */
 				(S2_PAGE_ACCESS_RW << DESC_S2AP_SHIFT) | (0b1111 << 2) |
 				DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
 
-         stash_descriptor((*addr), l3_descriptor, i);
 		 (*addr) += PAGE_SIZE;
 	}
 	kunmap(pg);
@@ -40,15 +41,15 @@ void create_level_three(struct page *pg, long *addr)
 void create_level_two(struct page *pg, long *addr)
 {
 	int i;
-	long *l2_descriptor;
+	long *l2_desc;
 	struct page *pg_lvl_three;
 
-	l2_descriptor = (long *) kmap(pg);
-	if (l2_descriptor == NULL) {
+	l2_desc = (long *) kmap(pg);
+	if (l2_desc == NULL) {
 		printk("%s desc NULL\n", __func__);
 		return;
 	}
-
+	memset(l2_desc, 0x00, PAGE_SIZE);
 	pg_lvl_three = alloc_pages(GFP_KERNEL | __GFP_ZERO, 9);
 	if (pg_lvl_three == NULL) {
 		printk("%s alloc page NULL\n", __func__);
@@ -59,7 +60,7 @@ void create_level_two(struct page *pg, long *addr)
 		// fill an entire 2MB of mappings
 		create_level_three(pg_lvl_three + i, addr);
 		// calc the entry of this table
-		l2_descriptor[i] =
+		l2_desc[i] =
 		    (page_to_phys(pg_lvl_three + i)) | DESC_TABLE_BIT |
 		    DESC_VALID_BIT;
 	}
@@ -70,16 +71,16 @@ void create_level_two(struct page *pg, long *addr)
 void create_level_one(struct page *pg, long *addr)
 {
 	int i;
-	long *l1_descriptor;
+	long *l1_desc;
 	struct page *pg_lvl_two;
 	int lvl_two_nr_pages =16;
 
-	l1_descriptor = (long *) kmap(pg);
-	if (l1_descriptor == NULL) {
+	l1_desc = (long *) kmap(pg);
+	if (l1_desc == NULL) {
 		printk("%s desc NULL\n", __func__);
 		return;
 	}
-
+	memset(l1_desc,0x00, PAGE_SIZE);
 	pg_lvl_two = alloc_pages(GFP_KERNEL | __GFP_ZERO, 4);
 	if (pg_lvl_two == NULL) {
 		printk("%s alloc page NULL\n", __func__);
@@ -89,19 +90,18 @@ void create_level_one(struct page *pg, long *addr)
 	for (i = 0; i < lvl_two_nr_pages ; i++) {
 		get_page(pg_lvl_two + i);
 		create_level_two(pg_lvl_two + i, addr);
-		l1_descriptor[i] = (page_to_phys(pg_lvl_two + i)) | DESC_TABLE_BIT | DESC_VALID_BIT;
+		l1_desc[i] = (page_to_phys(pg_lvl_two + i)) | DESC_TABLE_BIT | DESC_VALID_BIT;
 
 	}
 	kunmap(pg);
 }
 
-void create_level_zero(struct hyplet_vm *vm, struct page *pg, long *addr)
+void create_level_zero(struct hyplet_vm *vm, long* desc0, long *addr)
 {
 	struct page *pg_lvl_one;
-	long *l0_descriptor;;
 
 	pg_lvl_one = alloc_page(GFP_KERNEL | __GFP_ZERO);
-	if (pg_lvl_one == NULL) {
+	if (!pg_lvl_one) {
 		printk("%s alloc page NULL\n", __func__);
 		return;
 	}
@@ -109,16 +109,9 @@ void create_level_zero(struct hyplet_vm *vm, struct page *pg, long *addr)
 	get_page(pg_lvl_one);
 	create_level_one(pg_lvl_one, addr);
 
-	l0_descriptor = (long *) kmap(pg);
-	if (l0_descriptor == NULL) {
-		printk("%s desc NULL\n", __func__);
-		return;
-	}
-
-	memset(l0_descriptor, 0x00, PAGE_SIZE);
-	l0_descriptor[0] = (page_to_phys(pg_lvl_one)) | DESC_TABLE_BIT | DESC_VALID_BIT;
+	memset(desc0, 0x00, PAGE_SIZE);
+	desc0[0] = (page_to_phys(pg_lvl_one)) | DESC_TABLE_BIT | DESC_VALID_BIT;
 	vm->pg_lvl_one = (unsigned long)pg_lvl_one;
-	kunmap(pg);
 
 }
 
@@ -126,9 +119,9 @@ void hyplet_init_ipa(void)
 {
 	long addr = 0;
 	long vmid = 012;
-	struct page *pg_lvl_zero;
+	struct page *pg_lvl0;
 	int starting_level = 1;
-	struct hyplet_vm *vm = hyplet_get_vm();;
+	struct hyplet_vm *vm = hyplet_get_vm();
 
 /*
  tosz = 25 --> 39bits 64GB
@@ -139,22 +132,31 @@ void hyplet_init_ipa(void)
  	pa range = 1 --> 36 bits 64GB
 
 */
-	pg_lvl_zero = alloc_page(GFP_KERNEL | __GFP_ZERO);
-	if (pg_lvl_zero == NULL) {
+	pg_lvl0 = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	if (pg_lvl0 == NULL) {
 		printk("%s alloc page NULL\n", __func__);
 		return;
 	}
 
-	get_page(pg_lvl_zero);
-	create_level_zero(vm, pg_lvl_zero, &addr);
+	vm->ipa_desc_zero = (long *) kmap(pg_lvl0);
+	if (vm->ipa_desc_zero == NULL) {
+		printk("%s desc0 failed to map\n", __func__);
+		return;
+	}
 
-	if (starting_level == 0)
-		vm->vttbr_el2 = page_to_phys(pg_lvl_zero) | (vmid << 48);
-	else
+	create_level_zero(vm, vm->ipa_desc_zero, &addr);
+
+	if (starting_level == 0){
+		vm->vttbr_el2 = page_to_phys(pg_lvl0) | (vmid << 48);
+		vm->vttbr_el2_kern =  (unsigned long *)(page_to_virt(pg_lvl0));
+	} else {
 		vm->vttbr_el2 = page_to_phys((struct page *) vm->pg_lvl_one) | (vmid << 48);
+		vm->vttbr_el2_kern =  (unsigned long *)(page_to_virt(vm->pg_lvl_one));
+	}
 
-	malware_init_procfs();
+	acqusion_init_procfs();
 	make_vtcr_el2(vm);
+	vm->hyp_memstart_addr = memstart_addr;
 }
 
 
@@ -200,3 +202,80 @@ void make_mair_el2(struct hyplet_vm *vm)
  	hyplet_call_hyp(set_mair_el2, vm->mair_el2);
 }
 
+
+
+
+/*
+ * walk on the IPA and map it to the hypervisor
+ */
+int map_ipa_to_el2(struct hyplet_vm *vm)
+{
+	int i,j,k, n;
+	unsigned long *desc0 = vm->ipa_desc_zero;
+	unsigned long temp;
+
+	if ( create_hyp_mappings(desc0,
+			(void *)((unsigned long)desc0 + PAGE_SIZE- 1), PAGE_HYP) ){
+
+		printk("Failed to map desc0\n");
+		return -1;
+	}
+
+	for ( i = 0 ; i < PAGE_SIZE/sizeof(long); i++){
+		if (desc0[i]) {
+			unsigned long *desc1;
+			struct page *desc1_page;
+
+			temp = desc0[i] & 0x000FFFFFFFFFFC00LL;
+			desc1_page = phys_to_page(temp);
+			desc1 = kmap(desc1_page);
+			if ( create_hyp_mappings(desc1,
+					(void *)((unsigned long)desc1 + PAGE_SIZE - 1), PAGE_HYP) ){
+				printk("Failed to map desc1 to EL2\n");
+				return -1;
+			}
+
+			for (j = 0 ; j < PAGE_SIZE/sizeof(long); j++){
+				if (desc1[j]){
+					unsigned long *desc2;
+					struct page *desc2_page;
+
+					temp = desc1[j] & 0x000FFFFFFFFFFC00LL;
+
+					desc2_page = phys_to_page(temp);
+					desc2 = kmap(desc2_page);
+					create_hyp_mappings(desc2,
+							(void *)((unsigned long)desc2 + PAGE_SIZE- 1), PAGE_HYP);
+
+
+					for (k = 0 ; k < PAGE_SIZE/sizeof(long); k++){
+						if (desc2[k]){
+							struct page *desc3_page;
+							unsigned long *desc3;
+
+							temp = desc2[k] & 0x000FFFFFFFFFFC00LL;
+
+							desc3_page = phys_to_page(temp);
+							desc3 = kmap(desc3_page);
+							create_hyp_mappings(desc3,
+									(void *)((unsigned long)desc3 + PAGE_SIZE- 1), PAGE_HYP);
+
+							for (n = 0 ; n < PAGE_SIZE/sizeof(long); n++){
+								if (desc3[n]){
+									temp = desc3[n] & 0x000FFFFFFFFFFC00LL;
+								}
+							}
+
+							kunmap(desc3_page);
+						}
+					}
+
+					kunmap(desc2_page);
+				}
+			}
+
+			kunmap(desc1_page);
+		}
+	}
+	return 0;
+}

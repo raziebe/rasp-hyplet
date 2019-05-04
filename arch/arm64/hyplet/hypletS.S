@@ -72,13 +72,11 @@ EL1_sync:
 	mrs	x1, esr_el2
 	lsr	x2, x1, #ESR_ELx_EC_SHIFT	// Syndrom register shift by 26 bits
 
-	cmp x2, #ESR_ELx_EC_BKPT32
-	b.eq 	4f
 	cmp x2, #ESR_ELx_EC_BRK64	// user space performed watchpoint
-	b.eq 	4f
+	b.eq 4f
 
 	cmp x2, #ESR_ELx_EC_DABT_LOW
-	b.eq 	5f
+	b.eq 5f
 
 	cmp	x2, #ESR_ELx_EC_HVC64	// If not 10110 then we have a trap
 	b.ne 	3f
@@ -175,10 +173,28 @@ ENDPROC(hyplet_get_tcr_el1)
 ENTRY(hyplet_invld_tlb)
 	tlbi vae2, x0
 	dsb sy
-    	tlbi vale2, x0
+    tlbi vale2, x0
 	dsb sy
 	ret
 ENDPROC(hyplet_invld_tlb)
+
+// called in EL2
+ENTRY(hyplet_invld_ipa_tlb)
+	tlbi vmalle1is
+	dsb  ish
+	isb
+	ret
+ENDPROC(hyplet_invld_ipa_tlb)
+
+
+ENTRY(hyplet_invld_tlb_el1)
+	tlbi vae1, x0
+	dsb sy
+    tlbi vale1, x0
+	dsb sy
+	ret
+ENDPROC(hyplet_invld_tlb_el1)
+
 
 ENTRY(hyplet_invld_all_tlb)
 	tlbi alle2
@@ -206,9 +222,9 @@ ENTRY(hyplet_clear_cache)
         push   x2, x3
 
         mrs    x3, ctr_el0
-        ubfx   x3, x3,#16,#4  // x3  = DminLine
-        mov    x2, #4         // x2=word size
-        lsl    x2, x2, x3     // x2 = smallet cache line size
+        ubfx   x3, x3,#16,#4  // x3 = DminLine
+        mov    x2, #4         // x2 = Word size
+        lsl    x2, x2, x3     // x2 = Smallet cache line size
 
         add     x1, x0, x1    // end
         tlbi    vaae1 ,x0
@@ -220,8 +236,8 @@ ENTRY(hyplet_clear_cache)
         cmp     x0, x1
         b.lo    1b
 
-        pop x2,        x3
-        pop x1,        x0
+        pop 	x2, x3
+        pop 	x1, x0
         isb
         ret
 ENDPROC(hyplet_clear_cache)
@@ -232,18 +248,29 @@ ENTRY(hyplet_abrt_low)
 /*
 * Peform virtual to physical
 */
+
+/* 	far_el2 holds the faulting Virtual Address for
+	 all synchronous Instruction or Data Abort
+*/
 	mrs x0, far_el2
-	at  S12E1R, x0
+	mrs x1, far_el2
+
+/* 	 par_el2 returns the output address (OA) from an
+	 Address translation instruction that executed successfully
+*/
+	at  S1E1R, x1
 	mrs	x1, par_el1
-	kern_hyp_va x1
 	mrs x0, tpidr_el2
+
 	bl hyplet_handle_abrt
 /*
 	skip the faulting command
-*/
+
 	mrs x1, elr_el2
 	add x1, x1, #4
 	msr	elr_el2, x1
+*/
+
 	pop_registers
 	eret
 ENDPROC(hyplet_abrt_low)
@@ -351,6 +378,15 @@ ENTRY(hyplet_mdcr_off)
 	msr mdcr_el2,xzr
 	ret
 ENDPROC(hyplet_mdcr_off)
+
+ENTRY(hyplet_ipa_set_ro)
+	kern_hyp_va x0
+	push x0,lr
+	mov lr,x0
+	blr lr
+	pop x0,lr
+	ret
+ENDPROC(hyplet_ipa_set_ro)
 
 /*
  *	Executing ISR hyplet

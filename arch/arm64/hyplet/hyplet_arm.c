@@ -30,7 +30,7 @@
 
 #include <linux/sched.h>
 #include <asm/tlbflush.h>
-
+#include <linux/slab.h>
 #include <asm/virt.h>
 #include <asm/sections.h>
 
@@ -76,7 +76,7 @@ static void cpu_init_hyp_mode(void *discard)
 	 */
 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
 	hyp = hyplet_get_vm();
-
+	hyplet_map_to_el2(hyp);
 	make_mair_el2(hyp);
 	hyplet_call_hyp(hyplet_on, hyp);
 }
@@ -138,7 +138,6 @@ static int init_hyp_mode(void)
 	 */
 	for_each_possible_cpu(cpu) {
 		char *stack_page;
-		struct hyplet_vm *hyp;
 
 		stack_page = (char *)per_cpu(hyp_stack_page, cpu);
 		err = create_hyp_mappings(stack_page, stack_page + PAGE_SIZE, PAGE_HYP);
@@ -146,15 +145,7 @@ static int init_hyp_mode(void)
 			printk("Cannot map hyp stack\n");
 			goto out_err;
 		}
-		/*
-		 * Map EL2/EL1 shared data
-		 * */
-		hyp = hyplet_get(cpu);
-		err = create_hyp_mappings(hyp, hyp + 1, PAGE_HYP);
-		if (err) {
-			hyplet_err("Failed to map hyplet state");
-			goto out_err;
-		}
+
 	}
 	return 0;
 
@@ -238,10 +229,11 @@ static int hyplet_arch_init(void)
 		}
 	}
 
-	printk("HYP mode is available rc-24\n");
+	printk("HYP mode is available rc-25\n");
 	err = init_hyp_mode();
 	if (err)
 		return -1;
+
 
 	this_hyp = hyplet_get_vm();
 	INIT_LIST_HEAD(&this_hyp->hyp_addr_lst);
@@ -276,6 +268,26 @@ static int hyplet_arch_init(void)
 		} else{
 		hyplet_info("Microvisor Initialized\n");
 	}
+	if ( map_ipa_to_el2(this_hyp) ){
+		printk("Failed to map IPA\n");
+		return -1;
+	}
+
+	for_each_possible_cpu(cpu) {
+		if (raw_smp_processor_id() == cpu)
+			continue;
+		hyp = hyplet_get(cpu);
+		hyp->ipa_desc_zero =  this_hyp->ipa_desc_zero;
+		hyp->vttbr_el2_kern = this_hyp->vttbr_el2_kern;
+		hyp->vttbr_el2 	   = this_hyp->vttbr_el2;
+		hyp->hyp_memstart_addr = this_hyp->hyp_memstart_addr;
+	}
+	hyplet_info("IPA test...\n");
+	test_ipa_settings();
+	// Mark all pages RO
+	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(this_hyp),
+			S2_PAGE_ACCESS_R);
+	hyplet_info("Setting pages RO\n");
 	return 0;
 }
 

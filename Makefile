@@ -1,7 +1,7 @@
 VERSION = 4
 PATCHLEVEL = 14
 SUBLEVEL = 0
-EXTRAVERSION = -hyplet
+EXTRAVERSION = -memacq
 NAME = Fearless Coyote
 
 # *DOCUMENTATION*
