@@ -229,7 +229,7 @@ static int hyplet_arch_init(void)
 		}
 	}
 
-	printk("HYP mode is available rc-25\n");
+	printk("HYP mode is available rc-26\n");
 	err = init_hyp_mode();
 	if (err)
 		return -1;
@@ -246,6 +246,15 @@ static int hyplet_arch_init(void)
 #endif
 	/* initialize VM if needed */
 	hyplet_init_ipa();
+	this_hyp->iomemaddr =  kmalloc(sizeof(struct IoMemAddr), GFP_KERNEL);
+	memset(this_hyp->iomemaddr, 0x00, sizeof(struct IoMemAddr));
+	err = create_hyp_mappings((unsigned char  *)this_hyp->iomemaddr,
+			((unsigned char  *)this_hyp->iomemaddr) + sizeof(struct IoMemAddr), PAGE_HYP);
+	if (err){
+		hyplet_err("Failed to map iomemAddr\n");
+		return -1;
+	}
+
 	for_each_possible_cpu(cpu) {
 
 		if (raw_smp_processor_id() == cpu)
@@ -260,6 +269,7 @@ static int hyplet_arch_init(void)
 		hyp->vtcr_el2 = this_hyp->vtcr_el2;
 		hyp->vttbr_el2 = this_hyp->vttbr_el2;
 		hyp->mair_el2 = this_hyp->mair_el2;
+		hyp->iomemaddr  = this_hyp->iomemaddr;
 	}
 
 	on_each_cpu(cpu_init_hyp_mode, NULL,1);
@@ -268,7 +278,8 @@ static int hyplet_arch_init(void)
 		} else{
 		hyplet_info("Microvisor Initialized\n");
 	}
-	if ( map_ipa_to_el2(this_hyp) ){
+
+	if (map_ipa_to_el2(this_hyp)){
 		printk("Failed to map IPA\n");
 		return -1;
 	}
@@ -282,12 +293,7 @@ static int hyplet_arch_init(void)
 		hyp->vttbr_el2 	   = this_hyp->vttbr_el2;
 		hyp->hyp_memstart_addr = this_hyp->hyp_memstart_addr;
 	}
-	hyplet_info("IPA test...\n");
-	test_ipa_settings();
-	// Mark all pages RO
-	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(this_hyp),
-			S2_PAGE_ACCESS_R);
-	hyplet_info("Setting pages RO\n");
+
 	return 0;
 }
 

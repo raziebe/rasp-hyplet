@@ -15,8 +15,130 @@
 #include "hypletS.h"
 #include "hyp_mmu.h"
 
+/* We assume no more than 1000 io addresses are un use */
+
 
 extern pgd_t *hyp_pgd;
+
+unsigned long __hyp_text get_ioaddressesNR(void){
+	struct hyplet_vm *hyp = hyplet_get_vm();
+	return hyp->iomemaddr->ioaddressesNR;
+}
+
+unsigned long get_ttbr1_el1(void)
+{
+    u64 t;
+    asm("mrs %0,ttbr1_el1" : "=r" (t));
+    return t;
+}
+
+unsigned long get_tcr_el1(void)
+{
+    u64 t;
+    asm("mrs %0,tcr_el1" : "=r" (t));
+    return t;
+}
+
+unsigned int get_el1_address_size(void)
+{
+	long tcr_el1;
+	unsigned long ips;
+
+	tcr_el1 = get_tcr_el1();
+	ips = (tcr_el1  & 0x700000000)>>32;
+	switch(ips)
+	{
+	case 000:
+		return 32; // 4GB
+	case 0b001:
+		return 36; // 64GB
+	case 0b010:
+		return 40 ;// 1TB.
+	case 0b011:
+		return 42;// 4TB.
+	case 0b100:
+		return 44;//  16TB.
+	case 0b101:
+		return 48; // 256TB.
+	default:
+		return -1;
+	}
+}
+
+unsigned long get_el1_starting_address(void)
+{
+	long tcr_el1;
+	unsigned long t1sz;
+
+	tcr_el1 = get_tcr_el1();
+	t1sz = (tcr_el1 & 0x3F0000 ) >> 16;
+
+	return (0x1LL << (64 - t1sz));
+}
+
+int __hyp_text  is_device_mem(struct hyplet_vm *hyp,unsigned long phyaddr)
+{
+	int i = 0;
+	struct IoMemAddr* iomemaddr = KERN_TO_HYP(hyp->iomemaddr);
+
+	for (; i <  iomemaddr->ioaddressesNR; i++)
+		if (iomemaddr->iomemaddr[i] == (phyaddr & ~0xFFF) )
+				return 1;
+	return 0;
+}
+
+void walk_on_mmu_el1(void)
+{
+	unsigned long i,j,k;
+	unsigned long* pgd,*v_pgd;
+	unsigned long* pmd,*v_pmd;
+	unsigned long* pte;
+	unsigned long temp;
+	int mem_attr;
+	struct hyplet_vm *hyp = hyplet_get_vm();
+
+	// read ttbr_el1
+	pgd = phys_to_virt((phys_addr_t)get_ttbr1_el1());
+
+	for (i = 0 ; i < PAGE_SIZE/sizeof(long); i++){
+
+		temp = pgd[i] & 0xFFFFFFFFF000LL;
+		if (!temp)
+			continue;
+
+		v_pgd = (unsigned long *)phys_to_virt((phys_addr_t)temp);
+
+		for (j = 0 , pmd = v_pgd; j < PAGE_SIZE/sizeof(long); j++){
+
+			temp = pmd[j] & 0x0FFFFFFFFF000LL;
+			if (!temp)
+				continue;
+
+			v_pmd = phys_to_virt((phys_addr_t)temp);
+			if (!(pmd[j] & 0b10)) {
+				// is block
+				mem_attr = (pmd[j] & 0b11100)>>2;
+				if (mem_attr == 1)
+					printk("pmd %lx is DeviceNG\n",temp);
+				continue;
+			}
+
+			for (k = 0, pte = v_pmd; k < PAGE_SIZE/sizeof(long); k++){
+
+				temp = pte[k] & 0xFFFFFFFFF000LL;
+				if (!temp)
+					continue;
+				mem_attr = (pte[k] & 0b11100) >> 2;
+				if ((mem_attr == MT_DEVICE_nGnRnE)
+						|| (mem_attr == MT_DEVICE_nGnRE)
+						|| (mem_attr == MT_DEVICE_GRE) ) {
+
+					hyp->iomemaddr->iomemaddr[hyp->iomemaddr->ioaddressesNR++] = temp;
+				}
+			}
+		}
+	}
+}
 
 unsigned long kvm_uaddr_to_pfn(unsigned long uaddr)
 {

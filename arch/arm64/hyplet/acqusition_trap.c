@@ -112,16 +112,19 @@ void __hyp_text   walk_ipa_el2(struct hyplet_vm *vm,int s2_page_access)
 	}
 }
 
+
+
 /*
  * Called in EL2 to handle a faulted address
  */
-int __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm,
-		unsigned long phy_addr,unsigned long vaddr)
+unsigned long __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm,
+		unsigned long phy_addr)
 {
 	unsigned long* desc;
+	unsigned long *temp;
 
 	// first clean the attributes bits: address is in bits 47..12
-	phy_addr &= 0xFFFFFFFFFC00;
+	phy_addr &= 0xFFFFFFFFF000;
 
 	// Find the descriptor in the MMU
 	desc = ipa_find_page_desc(vm, phy_addr);
@@ -130,30 +133,35 @@ int __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm,
 	hyplet_invld_ipa_tlb(phy_addr >> 12);
 	vm->ipa_pages_processed++;
 	// copy its content
-	return 0xa;
+	if (is_device_mem(vm,phy_addr)){
+		return 0x99;
+	}
+
+	temp = (unsigned long *)hyp_phys_to_virt(phy_addr, vm);
+	return (unsigned long)temp[4];
 }
 
-void test_ipa_settings(void)
+void debug_func(void *addr)
 {
-	unsigned long phy_addr = 0xF4B5ED00;
-	unsigned long *desc;
-	desc = ipa_find_page_desc(hyplet_get_vm(), phy_addr);
-	*desc = make_special_page_desc(phy_addr,S2_PAGE_ACCESS_R);
-	mb();
+	printk("about to crash %p\n",(addr));
 }
-
 /* user interface  */
 static struct proc_dir_entry *procfs = NULL;
-/*
+
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
 {
-	struct hyplet_vm *vm;
+	struct hyplet_vm *vm = hyplet_get_vm();
 
-	vm = hyplet_get_vm();
+	printk("Updating MMIO\n");
+	walk_on_mmu_el1();
+	printk("Marking all pages RO\n");
+	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(vm),
+			S2_PAGE_ACCESS_R);
+
 	return count;
 }
-*/
+
 
 static int proc_open(struct inode *inode, struct file *filp)
 {
@@ -166,18 +174,19 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 {
 	ssize_t len = 0;
 	int cpu;
-	struct hyplet_vm *vm = hyplet_get_vm();
 
-	if ( filp->private_data == 0)
+	if (!filp->private_data)
 		return 0;
 
 	for_each_possible_cpu(cpu){
+		struct hyplet_vm *vm;
+
 		vm = hyplet_get(cpu);
 		len += sprintf(page + len,
 				"%d pages processed = %d\n",
 				vm->ipa_pages,vm->ipa_pages_processed);
 	}
-
+	len += sprintf(page + len, "Nr Io Addresses %ld\n",get_ioaddressesNR());
 	filp->private_data = 0x00;
 	return len;
 }
@@ -186,7 +195,7 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 static struct file_operations acqusition_proc_ops = {
 	.open = proc_open,
 	.read = proc_read,
-//	.write = proc_write,
+	.write = proc_write,
 };
 /*
 

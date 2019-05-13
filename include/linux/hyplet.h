@@ -127,6 +127,11 @@ struct virt_dev_access {
 	struct stage2_fault_addr faddr;
 };
 
+struct IoMemAddr {
+	unsigned long iomemaddr[1000];
+	unsigned long  ioaddressesNR;
+};
+
 struct hyplet_vm {
 	unsigned int irq_to_trap __attribute__ ((packed));
 	int	hyplet_id __attribute__ ((packed));//  the hyplet of this core
@@ -158,6 +163,7 @@ struct hyplet_vm {
 	s64 hyp_memstart_addr;	/* memstart_addr is use deduct the physical address */
 	int ipa_pages;
 	int ipa_pages_processed;
+	struct IoMemAddr* iomemaddr;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{

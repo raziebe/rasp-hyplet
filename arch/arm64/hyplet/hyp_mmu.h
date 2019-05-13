@@ -134,6 +134,12 @@ int create_hyp_user_mappings(void *,void*,pgprot_t prot);
 int __create_hyp_mappings(pgd_t *pgdp,
 				 unsigned long start, unsigned long end,
 				 unsigned long pfn, pgprot_t prot);
+unsigned long get_ttbr1_el1(void);
+unsigned int get_el1_address_size(void);
+unsigned long get_el1_starting_address(void);
+void walk_on_mmu_el1(void);
+unsigned long __hyp_text get_ioaddressesNR(void);
+int __hyp_text is_device_mem(struct hyplet_vm *hyp,unsigned long phyaddr);
 
 #define USER_TO_HYP(uva)	(uva)
 #endif

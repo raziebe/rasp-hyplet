@@ -255,22 +255,20 @@ ENTRY(hyplet_abrt_low)
 	mrs x0, far_el2
 	mrs x1, far_el2
 
+
 /* 	 par_el2 returns the output address (OA) from an
 	 Address translation instruction that executed successfully
 */
 	at  S1E1R, x1
 	mrs	x1, par_el1
+	tbnz x1,0,trnslt_err
 	mrs x0, tpidr_el2
 
 	bl hyplet_handle_abrt
-/*
-	skip the faulting command
-
-	mrs x1, elr_el2
-	add x1, x1, #4
-	msr	elr_el2, x1
-*/
-
+	b trnslt_ok
+trnslt_err:
+	mov x0,#33
+trnslt_ok:
 	pop_registers
 	eret
 ENDPROC(hyplet_abrt_low)

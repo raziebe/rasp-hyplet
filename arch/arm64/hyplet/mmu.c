@@ -358,7 +358,7 @@ out:
 	return err;
 }
 
-static phys_addr_t kaddr_to_phys(void *kaddr)
+phys_addr_t kaddr_to_phys(void *kaddr)
 {
 	if (!is_vmalloc_addr(kaddr)) {
 		BUG_ON(!virt_addr_valid(kaddr));

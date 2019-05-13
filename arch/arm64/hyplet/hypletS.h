@@ -19,5 +19,5 @@ void 		hyplet_set_vectors(unsigned long vbar_el2);
 unsigned long 	hyplet_get_vectors(void);
 unsigned long    read_mair_el2(void);
 void 		 set_mair_el2(unsigned long);
-int __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm, unsigned long paddr, unsigned long vaddr);
+unsigned long __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm, unsigned long paddr);
 #endif

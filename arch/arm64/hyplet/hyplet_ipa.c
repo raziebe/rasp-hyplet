@@ -8,10 +8,47 @@
 
 
 extern s64 memstart_addr;
+phys_addr_t kaddr_to_phys(void *kaddr);
+
+void map_stage3_to_hypervisor(unsigned long *addr)
+{
+	int err;
+	unsigned long *vaddr;
+	unsigned long phys_addr;
+	struct page* page;
+	extern pgd_t *hyp_pgd;
+	unsigned long start;
+
+	page = phys_to_page( (*addr) - PAGE_SIZE);
+	vaddr = kmap(page);
+
+	if (!is_vmalloc_addr(vaddr)) {
+		if (!virt_addr_valid(vaddr)){
+			kunmap(page);
+			return;
+		}
+	}
+	start = KERN_TO_HYP((unsigned long)vaddr);
+
+	phys_addr = kaddr_to_phys(vaddr);
+
+	err = __create_hyp_mappings(hyp_pgd, start,
+				    		start + PAGE_SIZE,
+							__phys_to_pfn(phys_addr),
+							PAGE_HYP);
+	if (err)
+		printk("Failed to map IPA virt %p\n", vaddr);
+
+	kunmap(page);
+}
+
 //
 // alloc 512 * 4096  = 2MB
 //
-void create_level_three(struct page *pg, long *addr)
+#define MEM_ATTR_SHIFT 2
+
+
+void create_level_three(struct page *pg, unsigned long *addr)
 {
 	int i;
 	long *l3_desc;
@@ -23,17 +60,15 @@ void create_level_three(struct page *pg, long *addr)
 	}
 	memset(l3_desc, 0x00, PAGE_SIZE);
 	for (i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
-		/*
-		 * Memory attribute fields in the VMSAv8-64 translation table format descriptors
-		 */
 		l3_desc[i] = (DESC_AF) |
-				(0b11 << DESC_SHREABILITY_SHIFT) |
-				/* The S2AP data access permissions, Non-secure EL1&0 translation regime  */
-				(S2_PAGE_ACCESS_RW << DESC_S2AP_SHIFT) | (0b1111 << 2) |
-				DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
-
-		 (*addr) += PAGE_SIZE;
+						(0b11 << DESC_SHREABILITY_SHIFT) |
+						/* The S2AP data access permissions, Non-secure EL1&0 translation regime  */
+						(S2_PAGE_ACCESS_RW << DESC_S2AP_SHIFT) | (0b1111 << MEM_ATTR_SHIFT) |
+						DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
+		(*addr) += PAGE_SIZE;
+		map_stage3_to_hypervisor(addr);
 	}
+
 	kunmap(pg);
 }
 
@@ -187,6 +222,7 @@ void make_vtcr_el2(struct hyplet_vm *vm)
 	    (vtcr_el2_tg0 << VTCR_EL2_TG0_BIT_SHIFT) |
 	    (vtcr_el2_ps << VTCR_EL2_PS_BIT_SHIFT);
 
+	printk("Using %d bits address space\n",get_el1_address_size());
 }
 
 /*
