@@ -148,21 +148,6 @@ void debug_func(void *addr)
 /* user interface  */
 static struct proc_dir_entry *procfs = NULL;
 
-static ssize_t proc_write(struct file *file, const char __user * buffer,
-			  size_t count, loff_t * dummy)
-{
-	struct hyplet_vm *vm = hyplet_get_vm();
-
-	printk("Updating MMIO\n");
-	walk_on_mmu_el1();
-	printk("Marking all pages RO\n");
-	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(vm),
-			S2_PAGE_ACCESS_R);
-
-	return count;
-}
-
-
 static int proc_open(struct inode *inode, struct file *filp)
 {
 	filp->private_data = (void *)0x01;
@@ -195,20 +180,60 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 static struct file_operations acqusition_proc_ops = {
 	.open = proc_open,
 	.read = proc_read,
-	.write = proc_write,
 };
-/*
 
-static ssize_t acqusition_ops_write(struct file *filp,
-	const char __user *umem, size_t size, loff_t *off)
+unsigned long uaddr_to_physaddr(unsigned long uaddr)
 {
-	int n = 0;
-	struct hyplet_vm *vm =  hyplet_get_vm();
+        unsigned long pfn;
+        struct page *pages[1];
+        int nr;
 
-	return size-n;
+        nr = get_user_pages_fast(uaddr,1, 0, (struct page **)&pages);
+        if (nr <= 0){
+               return 0x00;
+        }
+        pfn = page_to_pfn(pages[0]);
+        put_page(pages[0]);
+        return __pfn_to_phys(pfn);
 }
 
-static ssize_t acqusition_ops_read(struct file *filp, char __user *umem,
+
+
+static ssize_t honeypot_ops_write(struct file *filp,
+	const char __user *umem, size_t size, loff_t *off)
+{
+    struct hyplet_vm *vm =  hyplet_get_vm();
+    phys_addr_t phys_addr;
+    long long virt_addr;
+    long long virt_start;
+    long long virt_end;
+    unsigned long* desc;
+
+    virt_start = (long long)( ((long)umem + PAGE_SIZE) & PAGE_MASK);
+    virt_end = virt_start + PAGE_SIZE;
+    printk("raz: virt start 0x%llx\n",
+                     (virt_start + PAGE_SIZE) & PAGE_MASK );
+     /*
+      * Walk over the entire address range
+      * and mark it as not accessible.
+      * */
+     for (virt_addr = virt_start;
+                     virt_addr < virt_end; virt_addr += PAGE_SIZE) {
+
+//             phys_addr = virt_to_phys((void*)virt_addr);
+             desc = ipa_find_page_desc(vm, phys_addr);
+
+            phys_addr =  uaddr_to_physaddr(virt_addr);
+            printk("2. phys addr %lx\n",phys_addr);
+            desc = ipa_find_page_desc(vm, phys_addr);
+             *desc = make_special_page_desc(phys_addr,
+                             S2_PAGE_ACCESS_NONE);
+
+     }
+     return size;
+}
+
+static ssize_t honeypot_ops_read(struct file *filp, char __user *umem,
 				size_t size, loff_t *off)
 {
 	int n = 0;
@@ -216,24 +241,24 @@ static ssize_t acqusition_ops_read(struct file *filp, char __user *umem,
 	return size-n;
 }
 
-static struct file_operations acqusition_ops = {
-	write: acqusition_ops_write,
-	read:  acqusition_ops_read,
+static struct file_operations honeypot_ops = {
+	write: honeypot_ops_write,
+	read:  honeypot_ops_read,
 };
 
-int acqusition_ops_major = 0;
 
-*/
+int honeypot_ops_major = 0;
+
 void acqusion_init_procfs(void)
 {
 	procfs = proc_create_data("hyplet_stats", 
 			O_RDWR, NULL, &acqusition_proc_ops, NULL);
-	/*
-	acqusition_ops_major = register_chrdev(0, "acqusition", &acqusition_ops);
-	if (acqusition_ops_major < 0){
-		printk(MODULE_NAME "Failed to create acqusition procfs");
+
+	honeypot_ops_major = register_chrdev(0, "honeypot", &honeypot_ops);
+	if (honeypot_ops_major < 0){
+		printk(MODULE_NAME "Failed to create honeypot character dev");
 	}
-	*/
+
 }
 
 
