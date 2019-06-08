@@ -85,6 +85,15 @@
 #define __int8  char
 typedef unsigned __int8 UCHAR;
 
+struct attest_section {
+     int 	size;
+     int 	attest_offset; // offset of hooked function in vma
+     int	org_offset;	/* original offset */
+     unsigned char* attest_data; // the attest data
+     unsigned char* org_data; // the original data
+};
+
+
 
 #define	IRQ_TRAP_ALL			(UL(0xFFFF) )
 #define USER_CODE_MAPPED		(UL(1) << 0)
@@ -134,7 +143,7 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
-	struct virtual_device_access dev_access;
+//	struct virtual_device_access dev_access;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{

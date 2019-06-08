@@ -1,4 +1,4 @@
-ccflags-y +=   -D__HYPLET__  -D__HYPLET_VM__ -D__HYPLET_MALWARE_TRAP__ -DRASPBERRY_PI3 -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
+ccflags-y +=   -D__HYPLET__  -Iarch/arm/include/ -D__LINUX_ARM_ARCH__=8
 obj-$(CONFIG_HYPLET) += \
 	hyplet_mmu.o \
 	hypletS.o \
@@ -8,5 +8,4 @@ obj-$(CONFIG_HYPLET) += \
 	hyp-init.o \
 	hyplet_arm.o \
 	hyplet_ipa.o \
-	malware_trap.o \
 	mmu.o
