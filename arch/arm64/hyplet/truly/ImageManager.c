@@ -1,5 +1,6 @@
 #include "ImageManager.h"
 #include <linux/hyplet.h>
+#include <linux/highmem.h>
 
 void im_init(PIMAGE_MANAGER manager,
 	           void *driver_context,
@@ -24,7 +25,6 @@ void im_add_image(PIMAGE_MANAGER manager, UINT64 pid,  PIMAGE_FILE img)
 {
 	img->pid = pid;
 	manager->first_active_image =  img;
-
 }
 
 BOOLEAN im_is_process_exists(PIMAGE_MANAGER manager, size_t pid)
@@ -37,11 +37,10 @@ BOOLEAN im_is_process_exists(PIMAGE_MANAGER manager, size_t pid)
 void im_remove_process(PIMAGE_MANAGER manager, size_t pid)
 {
 	PIMAGE_FILE img;
+
 	if (!im_is_process_exists(manager,pid))
 		return;
 	img = manager->first_active_image;
-	vfree(img->attest.kaddr_copy);
-	vfree(img->hooked.kaddr_copy);
 	im_free_image(manager->first_active_image);
 	manager->first_active_image = NULL;
 }

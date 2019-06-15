@@ -30,28 +30,28 @@ PIMAGE_FILE image_file_init(void* data)
 {
 	PIMAGE_FILE image_file;
 	struct file* file;
-	size_t hooked_offset, attest_offset, sz;
-	void *hooked_section;
-	void* attest_section;
+	size_t trap_offset, sz;
+	void *trap_section;
+//	void* nop_section;
 
 	file = (struct file*)data;
-
-	hooked_section = get_section_data(file,
-									  read_from_file,
-									  ".hooked", /* search for the hooked section */
-									  NULL,
-									  &hooked_offset,
-									  NULL);
-	if (!hooked_section)
+/*
+	nop_section = get_section_data(file,
+				  read_from_file,
+				  ".nop"
+				  NULL,
+				  &nop_offset,
+				  NULL);
+	if (!nop_section)
 		return NULL;
-
-	attest_section = get_section_data(file,
-									read_from_file,
-									".attest",/* search for the attest(clear text) section */
-									NULL,
-									&attest_offset,
-									&sz);
-	if (!attest_section)
+*/
+	trap_section = get_section_data(file,
+					read_from_file,
+					".trap",/* search for the attest(clear text) section */
+					NULL,
+					&trap_offset,
+					&sz);
+	if (!trap_section)
 		return NULL;
 
 	if (sz > PAGE_SIZE){
@@ -63,21 +63,24 @@ PIMAGE_FILE image_file_init(void* data)
 	if (image_file == NULL)
 		return NULL;
 
-	image_file->attest.uaddr  = attest_section;
-	image_file->attest.offset = attest_offset;
-	image_file->attest.size   = sz;
-
-	image_file->hooked.uaddr  = hooked_section;
-	image_file->hooked.offset = hooked_offset;
-	image_file->hooked.size	  = sz;
-
-	printk("C-FLAT: hooked section is at %p offset %d, "
-			"attest section is at %p offset %d size=%d\n",
-				image_file->hooked.uaddr,
-				(int)image_file->hooked.offset,
-				image_file->attest.uaddr,
-				(int)image_file->attest.offset,
-				(int)image_file->attest.size);
-
+	memset(image_file,0x00,sizeof(IMAGE_FILE));
+/*
+	image_file->nop.uaddr  = nop_section;
+	image_file->nop.offset = nop_offset;
+	image_file->nop.size   = sz;
+*/
+	image_file->trap.uaddr  = trap_section;
+	image_file->trap.offset = trap_offset;
+	image_file->trap.size	= sz;
+/*
+	printk("C-FLAT: trap section is at %p offset %d size %d, "
+			"nop section is at %p offset %d size=%d\n",
+				image_file->trap.uaddr,
+				(int)image_file->trap.offset,
+				(int)image_file->trap.size,
+				image_file->nop.uaddr,
+				(int)image_file->nop.offset,
+				(int)image_file->nop.size);
+*/
 	return image_file;
 }

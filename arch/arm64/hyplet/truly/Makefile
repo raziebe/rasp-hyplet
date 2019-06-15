@@ -10,5 +10,6 @@ obj-$(CONFIG_HYPLET) += ImageManager.o \
 	vector.o \
 	common.o \
 	elf.o \
+	truly_procfs.o \
 	linux_kernfile.o \
 	tpdriver.o

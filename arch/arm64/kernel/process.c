@@ -349,6 +349,7 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *next)
 {
 	struct task_struct *last;
+	void tp_context_switch(struct task_struct *,struct task_struct *);
 
 	fpsimd_thread_switch(next);
 	tls_thread_switch(next);
@@ -365,6 +366,7 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
 	 */
 	dsb(ish);
 
+	tp_context_switch(prev,next);
 	/* the actual thread switch */
 	last = cpu_switch_to(prev, next);
 

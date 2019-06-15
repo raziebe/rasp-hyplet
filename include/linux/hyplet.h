@@ -75,24 +75,10 @@
 #define ESR_ELx_EC_SVC_64 0b10101
 #define ESR_ELx_EC_SVC_32 0b10001
 
-#define S2_PAGE_ACCESS_NONE	0b00
-#define S2_PAGE_ACCESS_R	0b01
-#define S2_PAGE_ACCESS_W	0b10
-#define S2_PAGE_ACCESS_RW	0b11
-
 #define __hyp_text __section(.hyp.text) notrace
 
 #define __int8  char
 typedef unsigned __int8 UCHAR;
-
-struct attest_section {
-     int 	size;
-     int 	attest_offset; // offset of hooked function in vma
-     int	org_offset;	/* original offset */
-     unsigned char* attest_data; // the attest data
-     unsigned char* org_data; // the original data
-};
-
 
 
 #define	IRQ_TRAP_ALL			(UL(0xFFFF) )
@@ -109,13 +95,6 @@ struct hyp_addr {
 
 };
 
-/*
- *
- */
-struct virtual_device_access {
-	unsigned long last_current;
-	unsigned long count;
-};
 
 struct hyplet_vm {
 	unsigned int irq_to_trap __attribute__ ((packed));
@@ -126,6 +105,7 @@ struct hyplet_vm {
 	unsigned long user_arg3;
 	unsigned long user_arg4;
 	unsigned long elr_el2;
+	unsigned long cnt;
 	unsigned long el2_log;
 
 	unsigned long hyplet_stack;	// this core hyplet stack
@@ -143,7 +123,7 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
-//	struct virtual_device_access dev_access;
+
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{

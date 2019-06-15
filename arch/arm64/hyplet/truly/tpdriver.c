@@ -19,7 +19,7 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 #include <linux/vmalloc.h>
-#include <linux/version.h>
+#include <asm/tlbflush.h>
 #include <linux/kallsyms.h>
 #include <linux/hyplet.h>
 
@@ -31,9 +31,9 @@
 
 #define     MAX_PERMS 777
 
+void tp_init_procfs(IMAGE_MANAGER *_imgmgr);
 
-struct img_layout_info
-{
+struct img_layout_info {
     size_t pid;
     size_t base;
     size_t per_cpu_base;
@@ -125,6 +125,7 @@ static void vma_tp_load(struct vm_area_struct* vma, void* context)
             goto clean;
 
         grp_type = get_group_by_arch_and_type(arch, type);
+
         fill_img_layout_info (&info,
                               current->pid,
                               vma->vm_start,
@@ -171,34 +172,6 @@ void* get_image_file(void)
 	return image_manager.first_active_image;
 }
 
-void put_hook_on_attest(PIMAGE_FILE img)
-{
-	memcpy((char *)(img->attest.uaddr) ,(char *)(img->hooked.kaddr_copy),img->attest.size);
-}
-
-void put_attest_back(PIMAGE_FILE img)
-{
-	memcpy((char *)(img->attest.uaddr) ,(char *)(img->attest.kaddr_copy),img->attest.size);
-}
-
-int setup_sections(PIMAGE_FILE img)
-{
-	/*
-	 *  Copy.attest to kernel. We do not walk on the pages here.
-	 *    The reason is because pages in 32bit over 64bit kernel are 2MB.
-	 *    So, there is no real kmap infrastructure for 2MB. so , we just memcpy
-	 *    and make sure the memcpy is in the context of verified process.
-	 */
-	img->hooked.kaddr_copy = vmalloc(img->hooked.size);
-	memcpy(img->hooked.kaddr_copy, img->hooked.uaddr, img->hooked.size);
-
-	img->attest.kaddr_copy = vmalloc(img->attest.size);
-	memcpy(img->attest.kaddr_copy,(void *)img->attest.uaddr, img->attest.size);
-
-	put_hook_on_attest(img);
-	return 0;
-}
-
 void tp_execve_handler(unsigned long ret_value)
 {
     char* exec_path, *path_to_free = NULL;
@@ -224,7 +197,6 @@ void tp_execve_handler(unsigned long ret_value)
     img = image_file_init(file);
     if(img){
     	im_add_image(&image_manager,current->pid, img);
-    	setup_sections(img);
     	printk("Found %d to be protected\n",current->pid);
    }
 
@@ -235,19 +207,120 @@ clean:
 }
 
 
+int tp_put_nop(void)
+{
+	PIMAGE_FILE img;
+//	unsigned short nop_16bit = 0xbf00;
+  	unsigned int nop_32bit = 0xe1a00000;
+	char *kaddr;
+	char *in_page_kaddr;
+	long offset;
+
+	if (!image_manager.first_active_image)
+		return -1;
+
+	img = image_manager.first_active_image;
+	if (!img->trap.bkpt_page)
+		return -1;
+
+	kaddr =  (char *)kmap(img->trap.bkpt_page);
+	offset = img->trap.elr_el2  & ~PAGE_MASK;
+	in_page_kaddr = kaddr + offset;
+	
+	printk("Put nop\n");
+	memcpy(in_page_kaddr, &nop_32bit ,sizeof(nop_32bit));
+	kunmap( img->trap.bkpt_page );
+	return 0;
+}
+
+int tp_put_trap(void)
+{
+	PIMAGE_FILE img;
+//	unsigned short bkpt3_16it = 0xbe03;
+	unsigned int bkpt_32bit = 0xe1200073;
+	char *kaddr;
+	char *in_page_kaddr;
+	long offset;
+
+	if (!image_manager.first_active_image)
+		return -1;
+
+	img = image_manager.first_active_image;
+
+	if (!img->trap.bkpt_page)
+		return -1;
+	
+	kaddr =  (char *)kmap(img->trap.bkpt_page);
+	offset = img->trap.elr_el2  & ~PAGE_MASK;
+	in_page_kaddr = kaddr + offset;
+	
+	printk("Put trap\n");
+	memcpy(in_page_kaddr, &bkpt_32bit ,sizeof(bkpt_32bit));
+
+	kunmap( img->trap.bkpt_page );
+	return 0;
+}
+
+
+int locate_trap_code(PIMAGE_FILE img)
+{
+	struct hyplet_vm *vm = hyplet_get_vm();
+
+	if (vm->elr_el2 == 0)
+		return 0;
+
+	if (img->trap.bkpt_page == 0) {
+		struct page *pg[1];
+		int nr;
+
+		nr = get_user_pages_fast(vm->elr_el2, 1, 0, (struct page **)&pg);
+		if (nr <= 0) {
+			printk("CFLAT: Failed to get page\n");
+			return 0;
+		}
+		img->trap.elr_el2 =  vm->elr_el2;
+		img->trap.bkpt_page =  pg[0];
+		printk("CFLAT: ELR_EL2=%lx\n", vm->elr_el2);
+		img->flags |= CFLAT_FLG_TRAP_MAPPED;
+	}
+	return 1;
+}
+
+void tp_context_switch(struct task_struct *prev,struct task_struct *next)
+{
+	PIMAGE_FILE img;
+
+	if (!image_manager.first_active_image)
+		return;
+
+	img = image_manager.first_active_image;
+	if (!(prev->pid == img->pid && current->pid == prev->pid)){
+		return;
+	}
+
+	printk("CFLAT: Switching prev %d current = %d\n",
+			img->pid,current->pid);
+	
+	if (!(img->flags & CFLAT_FLG_TRAP_MAPPED)){
+		if (!locate_trap_code(img) )
+			return;
+	}
+}
+
 void tp_handler_exit(struct task_struct *tsk)
 {
-	extern IMAGE_MANAGER image_manager;
-
 	if (!im_is_process_exists(&image_manager,tsk->pid))
-			return;
-	put_attest_back(get_image_file());
+		return;
+
+	printk("exiting...\n");
+	tp_put_trap();
 	im_remove_process(&image_manager,tsk->pid);
 }
 
 static int __init tp_init(void)
 {
     im_init(&image_manager, NULL, MemoryLayoutInit(TRUE));
+    tp_init_procfs(&image_manager);
     return 0;
 }
 

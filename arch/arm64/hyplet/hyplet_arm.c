@@ -251,14 +251,12 @@ static int hyplet_arch_init(void)
 	this_hyp->hcr_el2 =  HCR_RW;
 #ifdef __HYPLET_VM__
 	this_hyp->hcr_el2 |= HCR_VM;
+	hyplet_init_ipa();
 #endif
 	/* initialize VM if needed */
-	hyplet_init_ipa();
 	for_each_possible_cpu(cpu) {
-
 		if (raw_smp_processor_id() == cpu)
 			continue;
-
 		hyp = hyplet_get(cpu);
 		INIT_LIST_HEAD(&hyp->hyp_addr_lst);
 		INIT_LIST_HEAD(&hyp->callbacks_lst);
@@ -273,7 +271,7 @@ static int hyplet_arch_init(void)
 	on_each_cpu(cpu_init_hyp_mode, NULL,1);
 	if (this_hyp->hcr_el2 & HCR_VM) {
 		hyplet_info("Microvisor VM Initialized\n");
-		} else{
+	    } else{
 		hyplet_info("Microvisor Initialized\n");
 	}
 	return 0;

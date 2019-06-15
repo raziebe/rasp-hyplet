@@ -4,7 +4,6 @@
 #include <linux/delay.h>
 #include "hyp_mmu.h"
 #include "hypletS.h"
-#include "malware_trap.h"
 
 //
 // alloc 512 * 4096  = 2MB
@@ -22,16 +21,13 @@ void create_level_three(struct page *pg, long *addr)
 
 	for (i = 0; i < PAGE_SIZE / sizeof(long long); i++) {
 		/*
-		 * Memory attribute fields in the VMSAv8-64 translation table format descriptors
+		 * see page 1781 for details
 		 */
 		l3_descriptor[i] = (DESC_AF) |
-				(0b11 << DESC_SHREABILITY_SHIFT) |
-				/* The S2AP data access permissions, Non-secure EL1&0 translation regime  */
-				(S2_PAGE_ACCESS_RW << DESC_S2AP_SHIFT) | (0b1111 << 2) |
-				DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
-
-         stash_descriptor((*addr), l3_descriptor, i);
-		 (*addr) += PAGE_SIZE;
+			(0b11 << DESC_SHREABILITY_SHIFT) |
+			(0b11 << DESC_S2AP_SHIFT) | (0b1111 << 2) |	/* leave stage 1 unchanged see 1795 */
+		   	 DESC_TABLE_BIT | DESC_VALID_BIT | (*addr);
+		(*addr) += PAGE_SIZE;
 	}
 	kunmap(pg);
 }
@@ -153,7 +149,6 @@ void hyplet_init_ipa(void)
 	else
 		vm->vttbr_el2 = page_to_phys((struct page *) vm->pg_lvl_one) | (vmid << 48);
 
-	malware_init_procfs();
 	make_vtcr_el2(vm);
 }
 

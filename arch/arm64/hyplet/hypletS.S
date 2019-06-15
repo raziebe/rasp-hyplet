@@ -251,13 +251,18 @@ ENTRY(hyplet_rpc)
 	orr w1, w1, #0x1
 	msr spsel,x1
 
-3:	mrs	x0, elr_el2
+3:	mrs x4,tpidr_el2
+	mrs	x0, elr_el2
+	str	x0,[x4, #HYPLET_ELR_EL2]
 	add	x0, x0, #4
 	msr	elr_el2,x0
 
-	mrs x4,tpidr_el2
 	ldr x3,[x4, #HYPLET_SP_EL0]
 	msr sp_el0, x3
+// increment counter
+	ldr x3,[x4, #HYPLET_CNT]
+	add x3,x3,#1
+	str x3,[x4, #HYPLET_CNT]
 
 	pop_registers
 
