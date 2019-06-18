@@ -44,6 +44,15 @@ struct img_layout_info {
 
 IMAGE_MANAGER         image_manager;
 
+DEFINE_PER_CPU(struct cflat_stats, CFLAT_STATS);
+
+struct cflat_stats* cflat_stats_get(int cpu){
+	return &per_cpu(CFLAT_STATS, cpu);
+}
+
+#define ENTER_PROCESSOR	0
+#define EXIT_PROCESSOR	1
+
 static void fill_img_layout_info (struct img_layout_info* info,
                                   size_t pid,
                                   size_t base,
@@ -286,6 +295,31 @@ int locate_trap_code(PIMAGE_FILE img)
 	return 1;
 }
 
+void cflat_collect_stats(int dir)
+{
+	struct hyplet_vm *vm = hyplet_get_vm();
+	struct cflat_stats *csts = this_cpu_ptr(&CFLAT_STATS);
+	ktime_t ts;
+	
+	ts = ktime_get();
+	switch(dir)
+	{
+	case ENTER_PROCESSOR:
+		csts->ts = ts;
+		csts->traps_enter =  vm->cnt;
+		csts->traps_tot = 0;
+	break;
+
+	case EXIT_PROCESSOR:
+		csts->traps_tot = vm->cnt - csts->traps_enter;
+		csts->delta_ts = ktime_sub(ts , csts->ts); 
+	break;
+
+	default:
+		printk("CFLAT: Insane\n");
+	}
+}
+
 void tp_context_switch(struct task_struct *prev,struct task_struct *next)
 {
 	PIMAGE_FILE img;
@@ -294,16 +328,26 @@ void tp_context_switch(struct task_struct *prev,struct task_struct *next)
 		return;
 
 	img = image_manager.first_active_image;
-	if (!(prev->pid == img->pid && current->pid == prev->pid)){
+
+	if (!(img->flags & CFLAT_FLG_TRAP_MAPPED)){
+		if (prev->pid == img->pid && current->pid == img->pid) {
+			if (!locate_trap_code(img) )
+				return;
+		}
+	}
+
+	if (prev->pid == img->pid){
+		printk("CFLAT: Switching prev %d\n",
+			 next->pid);
+		cflat_collect_stats(ENTER_PROCESSOR);
 		return;
 	}
 
-	printk("CFLAT: Switching prev %d current = %d\n",
-			img->pid,current->pid);
-	
-	if (!(img->flags & CFLAT_FLG_TRAP_MAPPED)){
-		if (!locate_trap_code(img) )
-			return;
+	if (next->pid == img->pid){
+		printk("CFLAT: Switching next %d\n",
+			 next->pid);
+		cflat_collect_stats(EXIT_PROCESSOR);
+		return;
 	}
 }
 

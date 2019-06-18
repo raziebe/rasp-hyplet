@@ -64,6 +64,14 @@ static ssize_t tp_proc_read(struct file *filp, char __user * page,
 	ssize_t len = 0;
 	struct hyplet_vm *vm = NULL;
 	int cpu;
+	struct cflat_stats* csts;
+
+/*
+	ktime_t    ts;
+	ktime_t    delta_ts;
+	unsigned long traps_enter;
+	unsigned long traps_tot;
+*/
 
 	if (filp->private_data == 0)
 		return 0;
@@ -84,8 +92,11 @@ static ssize_t tp_proc_read(struct file *filp, char __user * page,
 
 	for_each_possible_cpu(cpu){
 		vm = hyplet_get(cpu);
-		len += sprintf(page + len, "#%d cnt %ld\n",
-				cpu, vm->cnt);
+		csts = cflat_stats_get(cpu);
+		len += sprintf(page + len, "#%d cnt %ld tot=%ld TS=%ld\n",
+				cpu, vm->cnt,
+				csts->traps_tot,
+				csts->ts);
 	}
 	filp->private_data = 0x00;
 	return len;

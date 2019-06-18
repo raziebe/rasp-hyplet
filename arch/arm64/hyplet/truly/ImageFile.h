@@ -1,20 +1,12 @@
 #pragma once
 
 #include "tp_types.h"
-
+#include "common.h"
 
 #define CFLAT_FLG_TRAP_MAPPED	(1<<1)	/* bkpt code can be accessed from kernel space */
 #define CFLAT_FLG_SET_TRAP		(1<<2)  /* manually triggered. set the trap to on */
 #define CFLAT_FLG_UNSET_TRAP	(1<<3)  /* manually triggered. unset the trap and put nop */
 #define CFLAT_STATE_TRAP_IS_ON	(1<<4)
-
-struct cflat_section{
-	char*   uaddr;
-	size_t  offset;
-	int 	size;
-	unsigned long elr_el2;
-	struct  page* bkpt_page;
-};
 
 struct _IMAGE_FILE {
 

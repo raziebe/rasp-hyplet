@@ -3,8 +3,6 @@
 
 #include "tp_types.h"
 
-PVOID tp_alloc(size_t size);
-void tp_free(PVOID p);
 
 #ifdef _LINUX
 	#define MULTI_LINE_MACRO_BEGIN do {
@@ -46,12 +44,28 @@ void tp_free(PVOID p);
 extern "C" {
 #endif
 
-	void __cdecl TPmemset(void * _Dst, int _Val, size_t _Size);
-	void TPmemcpy(void *dst, const void *src, size_t size);
-	size_t TPstrlen(const char *str);
-	int TPmemcmp(const void * _Buf1, const void * _Buf2, size_t _Size);
-	unsigned char get_cur_apic_id(void);
-	unsigned long long get_ticks_per_second(void);
+struct cflat_section{
+	char*   uaddr;
+	size_t  offset;
+	int 	size;
+	unsigned long elr_el2;
+	struct  page* bkpt_page;
+};
+
+struct cflat_stats {
+	ktime_t    ts;
+	ktime_t    delta_ts;
+	unsigned long traps_enter;
+	unsigned long traps_tot;
+};
+
+
+    void __cdecl TPmemset(void * _Dst, int _Val, size_t _Size);
+    void TPmemcpy(void *dst, const void *src, size_t size);
+    size_t TPstrlen(const char *str);
+    int TPmemcmp(const void * _Buf1, const void * _Buf2, size_t _Size);
+    unsigned char get_cur_apic_id(void);
+    unsigned long long get_ticks_per_second(void);
     
     BOOLEAN is_write_protect_enabled(void);
     void disable_write_protect(void);
@@ -65,7 +79,11 @@ extern "C" {
     void disable_supervisor_access_prot(void);
     void enable_supervisor_access_prot(void);
 
-	wchar_t* describe_status(OSSTATUS status);
+    wchar_t* describe_status(OSSTATUS status);
+    struct cflat_stats* cflat_stats_get(int cpu);
+
+    PVOID tp_alloc(size_t size);
+    void tp_free(PVOID p);
 
 #ifdef __cplusplus
 }
