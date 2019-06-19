@@ -219,7 +219,7 @@ clean:
 int tp_put_nop(void)
 {
 	PIMAGE_FILE img;
-//	unsigned short nop_16bit = 0xbf00;
+	unsigned short nop_16bit = 0xbf00;
   	unsigned int nop_32bit = 0xe1a00000;
 	char *kaddr;
 	char *in_page_kaddr;
@@ -237,7 +237,10 @@ int tp_put_nop(void)
 	in_page_kaddr = kaddr + offset;
 	
 	printk("Put nop\n");
-	memcpy(in_page_kaddr, &nop_32bit ,sizeof(nop_32bit));
+	if (img->flags & CFLAT_FLG_NOP32)
+		memcpy(in_page_kaddr, &nop_32bit ,sizeof(nop_32bit));
+	else
+		memcpy(in_page_kaddr, &nop_16bit ,sizeof(nop_16bit));
 	kunmap( img->trap.bkpt_page );
 	return 0;
 }
@@ -245,7 +248,7 @@ int tp_put_nop(void)
 int tp_put_trap(void)
 {
 	PIMAGE_FILE img;
-//	unsigned short bkpt3_16it = 0xbe03;
+	unsigned short bkpt_16bit = 0xbe03;
 	unsigned int bkpt_32bit = 0xe1200073;
 	char *kaddr;
 	char *in_page_kaddr;
@@ -264,7 +267,10 @@ int tp_put_trap(void)
 	in_page_kaddr = kaddr + offset;
 	
 	printk("Put trap\n");
-	memcpy(in_page_kaddr, &bkpt_32bit ,sizeof(bkpt_32bit));
+	if (img->flags & CFLAT_FLG_NOP32)
+		memcpy(in_page_kaddr, &bkpt_32bit ,sizeof(bkpt_32bit));
+	else
+		memcpy(in_page_kaddr, &bkpt_16bit ,sizeof(bkpt_16bit));
 
 	kunmap( img->trap.bkpt_page );
 	return 0;
@@ -289,6 +295,7 @@ int locate_trap_code(PIMAGE_FILE img)
 		}
 		img->trap.elr_el2 =  vm->elr_el2;
 		img->trap.bkpt_page =  pg[0];
+		put_page(pg[0]);
 		printk("CFLAT: ELR_EL2=%lx\n", vm->elr_el2);
 		img->flags |= CFLAT_FLG_TRAP_MAPPED;
 	}

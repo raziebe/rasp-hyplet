@@ -7,6 +7,7 @@
 #define CFLAT_FLG_SET_TRAP		(1<<2)  /* manually triggered. set the trap to on */
 #define CFLAT_FLG_UNSET_TRAP	(1<<3)  /* manually triggered. unset the trap and put nop */
 #define CFLAT_STATE_TRAP_IS_ON	(1<<4)
+#define CFLAT_FLG_NOP32			(1<<5)
 
 struct _IMAGE_FILE {
 

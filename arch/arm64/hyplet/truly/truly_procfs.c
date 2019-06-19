@@ -7,9 +7,6 @@
 #include "common.h"
 #include "ImageManager.h"
 
-int tp_put_trap(void);
-int tp_put_nop(void);
-
 /* user interface  */
 static struct proc_dir_entry *tpprocfs = NULL;
 static IMAGE_MANAGER *imgmgr = NULL;
@@ -36,6 +33,13 @@ static ssize_t tp_proc_write(struct file *file, const char __user * buffer,
 	if (imgmgr->first_active_image == NULL)
 		return -1;
 
+	if (!strncmp(buffer,"0",1)){
+		img->flags = (img->flags & ~CFLAT_FLG_SET_TRAP);
+		img->flags = img->flags | CFLAT_FLG_UNSET_TRAP;
+		if ( !tp_put_nop() )
+			return count;
+	}
+
 	if (!strncmp(buffer,"1",1)){
 		img->flags = (img->flags & ~CFLAT_FLG_UNSET_TRAP);
 		img->flags = img->flags | CFLAT_FLG_SET_TRAP;
@@ -43,12 +47,17 @@ static ssize_t tp_proc_write(struct file *file, const char __user * buffer,
 			return count;
 	}
 
-	if (!strncmp(buffer,"0",1)){
-		img->flags = (img->flags & ~CFLAT_FLG_SET_TRAP);
-		img->flags = img->flags | CFLAT_FLG_UNSET_TRAP;
-		if ( !tp_put_nop() )
-			return count;
+
+	if (!strncmp(buffer,"2",1)){
+		img->flags |= CFLAT_FLG_NOP32;
+		return count;
 	}
+
+	if (!strncmp(buffer,"3",1)){
+		img->flags &= ~CFLAT_FLG_NOP32;
+		return count;
+	}
+
 	return -1;
 }
 
@@ -66,34 +75,34 @@ static ssize_t tp_proc_read(struct file *filp, char __user * page,
 	int cpu;
 	struct cflat_stats* csts;
 
-/*
-	ktime_t    ts;
-	ktime_t    delta_ts;
-	unsigned long traps_enter;
-	unsigned long traps_tot;
-*/
 
 	if (filp->private_data == 0)
 		return 0;
 
-	if (imgmgr->first_active_image == NULL)
+	if (imgmgr->first_active_image == NULL){
 		len += sprintf(page + len,"not active\n");
-	else{
+	} else{
+		PIMAGE_FILE img = imgmgr->first_active_image;
 		char* in =  "in cflat";
 		char* out = "not in cflat";
+		char *bkpt_size = "bkpt size is 16bit";
 		char *cflat_state = out;
-		PIMAGE_FILE img = imgmgr->first_active_image;
-	
+
+		if (img->flags & CFLAT_FLG_NOP32)
+			bkpt_size = "bkpt size is 32bit";
+
 		if (img->flags & CFLAT_FLG_SET_TRAP)
 			cflat_state = in;
-		len += sprintf(page + len, "CFLAT: active PID=%d %s\n",
-				 img->pid, cflat_state);
+
+		len += sprintf(page + len, "CFLAT: active PID=%d %s %s\n",
+				 img->pid, cflat_state, bkpt_size);
 	}
+
 
 	for_each_possible_cpu(cpu){
 		vm = hyplet_get(cpu);
 		csts = cflat_stats_get(cpu);
-		len += sprintf(page + len, "#%d cnt %ld tot=%ld TS=%ld\n",
+		len += sprintf(page + len, "#%d cnt %ld tot=%ld TS=%lld\n",
 				cpu, vm->cnt,
 				csts->traps_tot,
 				csts->ts);
