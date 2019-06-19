@@ -158,7 +158,8 @@ int			hyplet_dump_irqs(void);
 int 		hyplet_hwirq_to_irq(int);
 void 		hyplet_stop(void *info);
 struct 		hyplet_vm* hyplet_get(int cpu);
-
+void 		hyplet_set_mdcr(void *d);
+void 		hyplet_unset_mdcr(void *d);
 
 unsigned long 	kvm_uaddr_to_pfn(unsigned long uaddr);
 void 		hyplet_set_cxt(long addr);
