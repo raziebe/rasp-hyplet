@@ -32,19 +32,9 @@ PIMAGE_FILE image_file_init(void* data)
 	struct file* file;
 	size_t trap_offset, sz;
 	void *trap_section;
-//	void* nop_section;
 
 	file = (struct file*)data;
-/*
-	nop_section = get_section_data(file,
-				  read_from_file,
-				  ".nop"
-				  NULL,
-				  &nop_offset,
-				  NULL);
-	if (!nop_section)
-		return NULL;
-*/
+
 	trap_section = get_section_data(file,
 					read_from_file,
 					".trap",/* search for the attest(clear text) section */
@@ -64,23 +54,11 @@ PIMAGE_FILE image_file_init(void* data)
 		return NULL;
 
 	memset(image_file,0x00,sizeof(IMAGE_FILE));
-/*
-	image_file->nop.uaddr  = nop_section;
-	image_file->nop.offset = nop_offset;
-	image_file->nop.size   = sz;
-*/
+
 	image_file->trap.uaddr  = trap_section;
 	image_file->trap.offset = trap_offset;
 	image_file->trap.size	= sz;
-/*
-	printk("C-FLAT: trap section is at %p offset %d size %d, "
-			"nop section is at %p offset %d size=%d\n",
-				image_file->trap.uaddr,
-				(int)image_file->trap.offset,
-				(int)image_file->trap.size,
-				image_file->nop.uaddr,
-				(int)image_file->nop.offset,
-				(int)image_file->nop.size);
-*/
+	image_file->flags  =  CFLAT_FLG_NOP32;
+
 	return image_file;
 }

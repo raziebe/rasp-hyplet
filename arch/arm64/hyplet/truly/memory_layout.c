@@ -73,20 +73,6 @@ BOOLEAN MemoryLayoutIsClonedProcess(PMemoryLayout ml, size_t pid)
     return FALSE;
 }
 
-void MemoryLayoutPrintPid(PMemoryLayout ml, size_t pid)
-{
-	size_t i, count;
-	PActiveProcess p = GetProcess(ml, pid, FALSE);
-	if (!p)
-		return;
-	count = IntervalsCount(p->modules);
-	for (i = 0; i < count; ++i)
-	{
-		Interval *interval = IntervalsGet(p->modules, i);
-		KdPrint(("%p - %p\n", interval->begin, interval->end));
-	}
-}
-
 PMemoryLayout MemoryLayoutInit(BOOLEAN create) 
 {
     PActiveProcess p;
