@@ -75,23 +75,6 @@ int __hyp_text is_hyp(void)
         return el == CurrentEL_EL2;
 }
 
-void hyplet_setup(void)
-{
-	struct hyplet_vm *hyp = hyplet_get_vm();
-	unsigned long vbar_el2 = (unsigned long)KERN_TO_HYP(__hyplet_vectors);
-	unsigned long vbar_el2_current;
-
-	hyplet_map();
-	
-	vbar_el2_current = hyplet_get_vectors();
-	if (vbar_el2 != vbar_el2_current) {
-		hyplet_info("vbar_el2 should restore\n");
-		hyplet_set_vectors(vbar_el2);
-	}
-	printk("Hyplet Setup %lx\n",(long)hyp);
-	hyplet_call_hyp(hyplet_on, hyp);
-}
-
 int is_hyplet_on(void)
 {
 	struct hyplet_vm *hyp = hyplet_get_vm();
@@ -106,9 +89,10 @@ void __close_hyplet(void *task, struct hyplet_vm *hyp)
 	if (hyp->tsk->mm != tsk->mm)
 		return;
 
-	if (!(hyp->state & HYPLET_OFFLINE_ON))
-		hyplet_call_hyp(hyplet_mdcr_off);
-	hyplet_call_hyp(hyplet_mdcr_off);
+	if (!(hyp->state & HYPLET_OFFLINE_ON)){
+		on_each_cpu(hyplet_unset_mdcr,NULL, 1);
+	}
+
 	hyp->tsk = NULL;
 	smp_mb();
 	while (hyp->state & HYPLET_OFFLINE_RUN) {
@@ -121,11 +105,11 @@ void __close_hyplet(void *task, struct hyplet_vm *hyp)
 	hyp->user_hyplet_code = 0;
 	hyplet_free_mem(hyp);
 	hyp->state  = HYPLET_OFFLINE_ON;
-	smp_mb();
+
 	hyp->elr_el2 = 0;
 	hyp->hyplet_stack = 0;
 	hyp->user_hyplet_code = 0;
-	smp_mb();
+
 	hyp->hyplet_id  = 0;
 	hyplet_info("Close hyplet\n");
 }
@@ -232,7 +216,7 @@ static void wait_for_hyplet(struct hyplet_vm *hyp,int ms)
 
 void set_current(void *tsk)
 {
-        asm ("msr sp_el0, %0" : "=r" (tsk));
+	asm ("msr sp_el0, %0" : "=r" (tsk));
 }
 
 void hyplet_offlet(unsigned int cpu)
@@ -270,20 +254,40 @@ void hyplet_offlet(unsigned int cpu)
 	printk("offlet : Exit %d\n",cpu);
 }
 
-int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *hyp)
+int hyplet_set_rpc(struct hyplet_ctrl* hplt,struct hyplet_vm *this_hyp)
 {
+	struct hyplet_vm *hyp;
+	int i;
 	/*
 	 * check that the function exists
 	*/
-	if ( hyp->user_hyplet_code !=
+	if (this_hyp->user_hyplet_code !=
 			hplt->rpc_set_func.func_addr ){
 		hyplet_err("User hyplet is incorrect\n");
 		return -EINVAL;
 	}
 
-	hyp->hyplet_id = hplt->rpc_set_func.func_id;
-	hyp->tsk = current;
-	hyplet_call_hyp(hyplet_mdcr_on);
+	this_hyp->hyplet_id = hplt->rpc_set_func.func_id;
+	this_hyp->tsk = current;
+
+	if (hplt->cpu >= 0 ){
+		hyplet_info("mdcr set\n");
+		hyplet_set_mdcr(NULL);
+		return 0;
+	}
+
+	for (i = 0 ; i < num_possible_cpus(); i++){
+
+		hyp = hyplet_get(i);
+		if (this_hyp == hyp)
+				continue;
+
+		hyp->hyplet_id = this_hyp->hyplet_id;
+		hyp->user_hyplet_code = this_hyp->user_hyplet_code;
+		hyp->tsk = this_hyp->tsk;
+	}
+	on_each_cpu(hyplet_set_mdcr, NULL, 1);
+
 	return 0;
 }
 
@@ -306,8 +310,21 @@ int offlet_assign(int cpu,struct hyplet_ctrl* target_hplt,struct hyplet_vm *src_
 	return 0;
 }
 
+void hyplet_set_mdcr(void *d)
+{
+	hyplet_info("set mdcr");
+	hyplet_call_hyp(hyplet_mdcr_on);
+}
+
+void hyplet_unset_mdcr(void *d)
+{
+	hyplet_info("unset mdcr");
+	hyplet_call_hyp(hyplet_mdcr_off);
+}
+
 int hyplet_ctl(unsigned long arg)
 {
+	int i;
 	struct hyplet_vm *hyp = hyplet_get_vm();
 	struct hyplet_ctrl hplt;
 	int rc = -1;
@@ -343,9 +360,19 @@ int hyplet_ctl(unsigned long arg)
 					hyplet_info("stack 0x%lx failed, not mapped\n",hplt.addr.addr);
 					return -EINVAL;
 				}
-				hyp->hyplet_stack =
-					(long)(hplt.addr.addr) +
+				if (hplt.cpu >= 0){
+					hyplet_info("Mapping stack\n");
+					hyp->hyplet_stack =
+							(long)(hplt.addr.addr) +
 						hplt.addr.size - PAGE_SIZE;
+					return 0;
+				}
+				for (i = 0 ; i < num_possible_cpus(); i++){
+					hyp = hyplet_get(i);
+					hyplet_info("Mapping stack in cpu %d\n",i);
+					hyp->hyplet_stack = (long)(hplt.addr.addr) +hplt.addr.size - PAGE_SIZE;
+				}
+
 				break;
 
 		case HYPLET_SET_CALLBACK:
@@ -383,13 +410,14 @@ int hyplet_ctl(unsigned long arg)
 				hyp->el2_log = hplt.addr.addr;
 				rc = 0;
 				break;
+
 		case HYPLET_MDCR_ON:
-				hyplet_call_hyp(hyplet_mdcr_on);
+				on_each_cpu(hyplet_set_mdcr, NULL, 1);
 				rc = 0;
 				break;
 
 		case HYPLET_MDCR_OFF:
-				hyplet_call_hyp(hyplet_mdcr_off);
+				on_each_cpu(hyplet_unset_mdcr,NULL, 1);
 				rc = 0;
 				break;
 	}
