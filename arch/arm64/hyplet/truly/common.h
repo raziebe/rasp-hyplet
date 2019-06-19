@@ -84,6 +84,9 @@ struct cflat_stats {
 
     PVOID tp_alloc(size_t size);
     void tp_free(PVOID p);
+    int tp_put_trap(void);
+    int tp_put_nop(void);
+
 
 #ifdef __cplusplus
 }
