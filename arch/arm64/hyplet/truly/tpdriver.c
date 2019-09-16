@@ -254,14 +254,17 @@ int tp_put_trap(void)
 	char *in_page_kaddr;
 	long offset;
 
-	if (!image_manager.first_active_image)
+	if (!image_manager.first_active_image){
+		printk("cflat: first active image\n");
 		return -1;
+	}
 
 	img = image_manager.first_active_image;
 
-	if (!img->trap.bkpt_page)
+	if (!img->trap.bkpt_page){
+		printk("cflat: No bkpt image\n");
 		return -1;
-	
+	}
 	kaddr =  (char *)kmap(img->trap.bkpt_page);
 	offset = img->trap.elr_el2  & ~PAGE_MASK;
 	in_page_kaddr = kaddr + offset;
