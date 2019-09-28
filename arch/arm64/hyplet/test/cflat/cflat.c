@@ -6,26 +6,37 @@
 #include <signal.h>
 #include <dlfcn.h>
 
+
 #include "../utils/hyplet_user.h"
 #include "../utils/hyplet_utils.h"
 
-#define NR_OPCODES	100
+#define NR_OPCODES	500000
 
 int func_id = 8;
 
 __attribute__ ((section("hyp_rw")))  unsigned int cnt = 0;
+__attribute__ ((section("hyp_rw")))  unsigned int nr_opcodes = 0;
 __attribute__ ((section("hyp_rw")))  unsigned int dump_data = 0;
-__attribute__ ((section("hyp_rw")))  unsigned long instr[NR_OPCODES][4] = {0};
+__attribute__ ((section("hyp_rw")))  unsigned long instr[NR_OPCODES][5] = {0};
 
 __attribute__ ((section("hyp_rx")))  long record_opcode(long a1,long a2,long a3,long a4)
 {
-	instr[cnt][0] = a1;
-	instr[cnt][1] = a2;
-	instr[cnt][2] = a3;
-	instr[cnt][3] = a4;
-        if (a1 == 0x40)
-		dump_data = 1;
+	instr[cnt][0] = hyp_gettime();
+	instr[cnt][1] = a1;
+	instr[cnt][2] = a2;
+	instr[cnt][3] = a3;
+	instr[cnt][4] = a4;
+
 	cnt++;
+	if (a1 == 101) {
+ 		dump_data = 1;
+		__sync_synchronize();
+		nr_opcodes = cnt;
+		__sync_synchronize();
+		cnt = 0;
+		return 0;
+	}
+   	cnt = cnt % NR_OPCODES;
 	return 0;
 }
 
@@ -58,35 +69,8 @@ static int hyplet_start(int argc, char *argv[])
 		return -1;
   	}
 
-	if (!get_section_addr("hyp_x", &hyp_sec_x, &hyp_sec_x_size)) {
-		fprintf(stderr, "hyp_x: \n");
-		return -1;
-	}	
-	
-	if (!get_section_addr("hyp_rw", &hyp_sec_rw, &hyp_sec_rw_size)) {
-		fprintf(stderr, "hyp_rw:\n");
-		return -1;
-	}	
-
-	if (!get_section_addr("hyp_rx", &hyp_sec_rx, &hyp_sec_rx_size)) {
-		fprintf(stderr, "hyp_rw:\n");
-		return -1;
-	}
-
-	
-	if (hyplet_map_vma((void *)hyp_sec_rw, cpu)) {
-		fprintf(stderr, "hyplet: Failed to hyp_rw\n");
-		return -1;
-	}
-
-
-	if (hyplet_map_vma((void*)hyp_sec_x, cpu)) {
-		fprintf(stderr, "hyplet: Failed to map sec_x\n");
-		return -1;
-	}
-
-	if (hyplet_map_vma((void*)hyp_sec_rx, cpu)) {
-		fprintf(stderr, "hyplet: Failed to map sec_x\n");
+	if (hyplet_map_all(cpu)) {
+		fprintf(stderr, "hyplet: Failed to map all\n");
 		return -1;
 	}
 
@@ -133,10 +117,12 @@ int main(int argc, char *argv[])
 {
     int rc;
     int i;
-
-    if (hyplet_start(argc, argv)) {
-	return -1;
-    }
+    int iter = 0;
+    int run = 1;
+    FILE* file;
+    char fname[256];
+    char buf[256];
+    FILE *fp;
 
     for (i = 0 ; i < NR_OPCODES; i++) {
 	instr[i][0] = -1;
@@ -145,16 +131,31 @@ int main(int argc, char *argv[])
 	instr[i][3] = -1;
     }
 
+    if (hyplet_start(argc, argv)) {
+        return -1;
+    }
+
     printf("\nHyplet set. Prepare to run trap\n");
 
-    while(1) {
+    while(run) {
+	
        sleep(1);
-       if( dump_data ) {
-            for (i = 0; i < cnt ; i++)
-     	         printf("DATA %d) %lx,%lx,%lx %lx\n",cnt, 
+       if (dump_data) {
+
+	    dump_data = 0;
+	    __sync_synchronize();
+	    sprintf(fname,"/tmp/result_%d", iter++);
+            fp =  fopen(fname,"w+");
+	    printf("Start to dump data\n");
+            for (i = 0; i < nr_opcodes ; i++) {
+     	        sprintf(buf,"%d,%ld,%lx,%lx,%lx,%lx\n",i, 
 			instr[i][0], instr[i][1],  
-			instr[i][2], instr[i][3] );
-	   dump_data = 0;
-        }
+			instr[i][2], instr[i][3], instr[i][4] );
+		fwrite(buf,strlen(buf),1,fp);
+            }
+	 fclose(fp);
+   	 printf("wrote %s\n",fname);
+    	}
    }
+   return 0;
 }
