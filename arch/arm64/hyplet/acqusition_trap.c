@@ -3,6 +3,7 @@
 #include <linux/hyplet.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
+#include <linux/vmalloc.h>
 #include <linux/fs.h>		/* for file_operations */
 #include <linux/slab.h>	/* versioning */
 #include <linux/cdev.h>
@@ -113,6 +114,71 @@ void __hyp_text   walk_ipa_el2(struct hyplet_vm *vm,int s2_page_access)
 }
 
 
+#define RAMSTR "System RAM"
+
+int __hyp_text is_black_listed(long pfn)
+{
+	return ((pfn <= 34940 && pfn >= 34935) || (pfn > 242688) || (pfn < 0));
+}
+
+static void map_range_to_el2(struct resource * res) 
+{
+    int rc;
+
+    resource_size_t i, is = PAGE_SIZE;
+    long pfn;
+    struct page * p;
+
+    printk("Mapping Ram Range [0x%llx,0x%llx] size %d\n", 
+	res->start,res->end, (int)(res->end - res->start));
+
+    for (i = res->start  ; i < res->end ; i += is) {
+	pfn = (i >> PAGE_SHIFT);
+	
+	if (is_black_listed(pfn)) {
+		printk("Skipping pfn %ld address %p\n",pfn,(unsigned long *)i);
+		continue;
+	}
+
+        p = pfn_to_page((i) >> PAGE_SHIFT);
+        is = min((size_t) PAGE_SIZE, (size_t) (res->end - i + 1));
+
+        if (is < PAGE_SIZE) {
+            // We can't map partial pages and
+            // the linux kernel doesn't use them anyway
+            printk("Partial page: vaddr %p size: %lu", (void *) i, (unsigned long) is);
+        } 
+		else{
+
+			rc = hyp_map_physical((unsigned long *)(i),
+					(unsigned long *)(i + PAGE_SIZE), PAGE_HYP);
+			if (rc < 0 ){
+				printk("Failed to hyp map page = %lld\n",i);
+			}
+	   
+        }
+    }
+}
+
+void map_system_ram_to_hypervisor(void)
+{
+    struct resource *p;
+
+    for (p = iomem_resource.child; p ; p = p->sibling) {
+        if (strcmp(p->name, RAMSTR))
+            continue;
+        map_range_to_el2(p);
+    }
+}
+
+/* Lime's stuff */
+void __hyp_text hyp_memcpy(char *t,char *s, int size)
+{
+	int i;
+	
+	for (i = 0 ; i < size; i++)
+		t[i] = s[i];
+}
 
 /*
  * Called in EL2 to handle a faulted address
@@ -121,44 +187,135 @@ unsigned long __hyp_text hyplet_handle_abrt(struct hyplet_vm *vm,
 		unsigned long phy_addr)
 {
 	unsigned long* desc;
-	unsigned long *temp;
+	long pfn;
+	struct LimePagePool* lp = NULL;
 
-	// first clean the attributes bits: address is in bits 47..12
+	// First clean the attributes bits: address is in bits 47..12
 	phy_addr &= 0xFFFFFFFFF000;
 
 	// Find the descriptor in the MMU
 	desc = ipa_find_page_desc(vm, phy_addr);
-	// return descriptor to its RW
+
+	// Return descriptor to its RW
 	*desc = make_special_page_desc(phy_addr, S2_PAGE_ACCESS_RW);
 	hyplet_invld_ipa_tlb(phy_addr >> 12);
 	vm->ipa_pages_processed++;
-	// copy its content
-	if (is_device_mem(vm,phy_addr)){
+
+	if (is_device_mem(vm, phy_addr)){
 		return 0x99;
 	}
 
-	temp = (unsigned long *)hyp_phys_to_virt(phy_addr, vm);
-	return (unsigned long)temp[4];
+	if(!vm->limePool)
+		return -1;
+
+	lp  = (struct LimePagePool *) KERN_TO_HYP(vm->limePool);
+	pfn = (phy_addr >> PAGE_SHIFT);
+
+	// copy its content
+	if (!is_black_listed(pfn)){
+		struct LimePageContext* slot;
+		unsigned char *p = (unsigned char *)phy_addr;
+
+		vm->cur_phy_addr = phy_addr;
+
+		/* spin locking the page pool(critical section) */
+		hyp_spin_lock(&lp->lock);
+
+		/* Find page thats not used in the pool */
+		slot =  pool_find_empty_slot(lp);
+		lp->size = lp->size % POOL_SIZE;
+		slot = &lp->pool[lp->size % POOL_SIZE]; // RR 
+		slot->phy_addr = phy_addr;
+
+		hyp_memcpy((char *)KERN_TO_HYP(slot->hyp_vaddr), p, PAGE_SIZE);
+
+		/* Insert the page to the pool */
+		pool_insert_one(lp);
+
+		/* unlocking the lime pool(critical section) */
+		hyp_spin_unlock(&lp->lock);
+	}
+
+	return 0;
 }
 
-void debug_func(void *addr)
+
+
+/* Called From LiME right before turning on the acqusion */
+int setup_lime_pool(void)
 {
-	printk("about to crash %p\n",(addr));
-}
+	int cpu;
+	int rc;
+	int i;
+	struct LimePagePool* limepool = NULL;
+	struct hyplet_vm *vm;
+	struct page *pg;
+
+	limepool = kmalloc( sizeof(struct LimePagePool), GFP_KERNEL);
+	if(!limepool)
+	{
+		printk("Limepool kmalloc failed");
+		return -1;
+	}
+	memset(limepool, 0x00, sizeof(struct LimePagePool));
+	hyp_spin_lock_init(&limepool->lock);
+
+	for_each_possible_cpu(cpu){
+		vm = hyplet_get(cpu);
+		vm->limePool = limepool;
+	}
+
+	rc  = create_hyp_mappings(limepool, limepool + sizeof(*limepool), PAGE_HYP);
+	if (rc){
+		printk("Cannot map limepool\n");
+		return -1;
+	}
+
+	/* Allocate space for each page in the pool */
+	for (i = 0 ; i < POOL_SIZE; i++) {
+		void *v;
+
+		pg = alloc_page(GFP_KERNEL);
+		v =  kmap(pg);
+		rc  = create_hyp_mappings(v, v + PAGE_SIZE - 1, PAGE_HYP);
+		if (rc){
+			printk("Cannot map hyp %d \n",i);
+		}
+
+		/* Put pointer to allocated page in the pool */
+		limepool->pool[i].hyp_vaddr = (long *)v;
+	}
+	return 0;
+}	
+EXPORT_SYMBOL_GPL(setup_lime_pool);
+
+
 /* user interface  */
 static struct proc_dir_entry *procfs = NULL;
+
+void turn_on_acq(void)
+{
+	struct hyplet_vm *vm = hyplet_get_vm();
+
+	walk_on_mmu_el1();
+	map_system_ram_to_hypervisor();
+	if (setup_lime_pool()){
+		printk(KERN_EMERG "SETUP LIME POOL FAILED\n");
+		return;
+	}
+	printk(KERN_EMERG "Marking all pages RO\n");
+	printk(KERN_EMERG "Fnished turn_on_acq\n");
+	
+	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(vm),
+			S2_PAGE_ACCESS_R);
+}
+EXPORT_SYMBOL_GPL(turn_on_acq);
 
 static ssize_t proc_write(struct file *file, const char __user * buffer,
 			  size_t count, loff_t * dummy)
 {
-	struct hyplet_vm *vm = hyplet_get_vm();
-
-	printk("Updating MMIO\n");
-	walk_on_mmu_el1();
-	printk("Marking all pages RO\n");
-	hyplet_call_hyp((void *)KERN_TO_HYP(walk_ipa_el2), KERN_TO_HYP(vm),
-			S2_PAGE_ACCESS_R);
-
+	printk("Updating MMU\n");
+	turn_on_acq();
 	return count;
 }
 
@@ -174,6 +331,8 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 {
 	ssize_t len = 0;
 	int cpu;
+	long phy_addr = -1;
+	struct LimePageContext* pool_min;
 
 	if (!filp->private_data)
 		return 0;
@@ -183,10 +342,21 @@ static ssize_t proc_read(struct file *filp, char __user * page,
 
 		vm = hyplet_get(cpu);
 		len += sprintf(page + len,
-				"%d pages processed = %d\n",
-				vm->ipa_pages,vm->ipa_pages_processed);
+				"%d: pages processed = %d phyaddr=%lx\n",
+				cpu,
+				vm->ipa_pages_processed,
+ 				vm->cur_phy_addr);
 	}
-	len += sprintf(page + len, "Nr Io Addresses %ld\n",get_ioaddressesNR());
+
+	if (hyplet_get_vm()->limePool) {
+		pool_min = pool_peek_min(hyplet_get_vm()->limePool);
+
+		if (pool_min != NULL)
+			phy_addr = pool_min->phy_addr;
+		len += sprintf(page + len, "size = %d / phy_addr = %lx\n", 
+				hyplet_get_vm()->limePool->size, 
+				phy_addr);
+	}
 	filp->private_data = 0x00;
 	return len;
 }
@@ -197,43 +367,12 @@ static struct file_operations acqusition_proc_ops = {
 	.read = proc_read,
 	.write = proc_write,
 };
-/*
 
-static ssize_t acqusition_ops_write(struct file *filp,
-	const char __user *umem, size_t size, loff_t *off)
-{
-	int n = 0;
-	struct hyplet_vm *vm =  hyplet_get_vm();
 
-	return size-n;
-}
-
-static ssize_t acqusition_ops_read(struct file *filp, char __user *umem,
-				size_t size, loff_t *off)
-{
-	int n = 0;
-	struct hyplet_vm *vm =  hyplet_get_vm();
-	return size-n;
-}
-
-static struct file_operations acqusition_ops = {
-	write: acqusition_ops_write,
-	read:  acqusition_ops_read,
-};
-
-int acqusition_ops_major = 0;
-
-*/
 void acqusion_init_procfs(void)
 {
 	procfs = proc_create_data("hyplet_stats", 
 			O_RDWR, NULL, &acqusition_proc_ops, NULL);
-	/*
-	acqusition_ops_major = register_chrdev(0, "acqusition", &acqusition_ops);
-	if (acqusition_ops_major < 0){
-		printk(MODULE_NAME "Failed to create acqusition procfs");
-	}
-	*/
 }
 
 

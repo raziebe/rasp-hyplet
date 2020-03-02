@@ -1,6 +1,8 @@
 #ifndef __HYPLET_H_
 #define __HYPLET_H_
 
+#include <linux/hyp_spinlock.h>
+
 // page 1775
 #define DESC_TABLE_BIT 			( UL(1) << 1 )
 #define DESC_VALID_BIT 			( UL(1) << 0 )
@@ -127,10 +129,45 @@ struct virt_dev_access {
 	struct stage2_fault_addr faddr;
 };
 
+
 struct IoMemAddr {
-	unsigned long iomemaddr[1000];
+	unsigned long iomemaddr[100];
 	unsigned long  ioaddressesNR;
 };
+
+#define LiME_POOL_PAGE_OCCUPIED	0x1
+#define LiME_POOL_PAGE_FREE	0x0
+#define POOL_SIZE			800
+
+struct LimePageContext{
+	long* hyp_vaddr; 		// Memory content of the page
+	unsigned long phy_addr; // Original physical address of this page (from iomem) -> lime pool heap should be compared by this
+	//atomic_long_t state;	
+	//unsigned char state; 	// State of page in the pool
+	// TODO: add synchronize method for accessing this struct from different cpu's | e.g make state atomic or add semaphores, etc..
+};
+
+struct LimePagePool {
+	struct LimePageContext pool[POOL_SIZE];
+	int size; // Current size of the pool
+	hyp_spinlock_t lock;// The spin lock for the lime page pool
+	atomic_long_t lime_current_place; 
+	// TODO: find purpose if one exists for this variable
+	int cur;
+};
+
+/* Heap / priority_queue functions for the lime pool */
+void pool_heapify_insertion(struct LimePagePool* heap);
+void pool_heapify_removal(struct LimePagePool* heap, int index);
+
+/* Returns the slot in [size + 1] for the caller to fill. after that, please call insert_one() to apply changes */
+struct LimePageContext* pool_find_empty_slot(struct LimePagePool* heap);
+
+ /* Call find_empty_slot to add an item and then immediately call this function */
+void pool_insert_one(struct LimePagePool* heap);
+
+void pool_pop_min(struct LimePagePool* heap);
+struct LimePageContext* pool_peek_min(struct LimePagePool* heap);
 
 struct hyplet_vm {
 	unsigned int irq_to_trap __attribute__ ((packed));
@@ -160,10 +197,12 @@ struct hyplet_vm {
 	unsigned long vttbr_el2;
 	unsigned long hcr_el2;
 	unsigned long mair_el2;
-	s64 hyp_memstart_addr;	/* memstart_addr is use deduct the physical address */
+	long cur_phy_addr;
 	int ipa_pages;
 	int ipa_pages_processed;
+	long hyp_memstart_addr;
 	struct IoMemAddr* iomemaddr;
+	struct LimePagePool* limePool;
 } __attribute__ ((aligned (8)));
 
 struct hyp_wait{
